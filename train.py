@@ -161,14 +161,14 @@ def train(args):
                 #      using activations.
 
                 edge_mat = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1]))
-
-                pred_path, jacobian = krnl_mdl.forward(outputs=st_embeddings,ngh=combined_ngh, visual_path=vislet)
+                
+                with tf.Session() as sess2:                    
+                    #pred_path, jacobian = krnl_mdl.forward(outputs=st_embeddings,ngh=combined_ngh, visual_path=vislet)
+                    pred_path, jacobian = sess2.run(krnl_mdl.forward, feed_dict={outputs:st_embeddings,ngh:combined_ngh, visual_path:vislet})
+                    jacobian.backward()
                 # generate weighted embeddings of spatial/temporal motion features in the frame
                 # decode edge_mat embeddings into relations
                 # rlns = tf.Sigmoid(jacobian)
-
-                #jacobian.backward()
-
                 relational_loss = nri.eval_rln_ngh(nghood_enc, combined_ngh)
                 relational_loss.backward()
 
