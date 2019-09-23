@@ -167,7 +167,7 @@ def train(args):
                 # decode edge_mat embeddings into relations
                 # rlns = tf.Sigmoid(jacobian)
 
-                jacobian.backward()
+                #jacobian.backward()
 
                 relational_loss = nri.eval_rln_ngh(nghood_enc, combined_ngh)
                 relational_loss.backward()
