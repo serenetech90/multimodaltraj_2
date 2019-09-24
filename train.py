@@ -88,100 +88,117 @@ def train(args):
     traj = dataloader.load_trajectories(data_file=dataloader.sel_file)
     batch, target_traj, _ = dataloader.next_step(targets=target_traj)
 
-    with tf.Session() as sess:
-        print('session started')
-        # dim = [720, 576]
-        dim = int(args.neighborhood_size / args.grid_size)
+    tf_graph = tf.Graph()
+    with tf.Session(graph=tf_graph) as sess:
+        with sess.as_default():
+            print('session started')
+            # dim = [720, 576]
+            dim = int(args.neighborhood_size / args.grid_size)
+            # tf.enable_eager_execution()
+            graph = nx_g.online_graph(args)
+            # Train
+            while i < args.num_epochs:
+                graph_t = graph.ConstructGraph(current_batch=batch, framenum=0)
+                for frame in range(len(batch)):
+                    # check if get_node_attr gets complete sequence for all nodes
+                    # num_nodes x obs_length
+                    batch_v = list(graph_t.get_node_attr(param='node_pos_list').values())
+                    batch_v = np.transpose(batch_v)
+                    vislet = np.expand_dims(a=batch_v[len(batch_v) - 1], axis=0)
 
-        graph = nx_g.online_graph(args)
-        # Train
-        while i < args.num_epochs:
-            graph_t = graph.ConstructGraph(current_batch=batch, framenum=0)
-            for frame in range(len(batch)):
-                # check if get_node_attr gets complete sequence for all nodes
-                # num_nodes x obs_length
-                batch_v = list(graph_t.get_node_attr(param='node_pos_list').values())
-                batch_v = np.transpose(batch_v)
-                vislet = tf.expand_dims(input=batch_v[len(batch_v) - 1], axis=0)
+                    true_path.append(batch[frame+args.seq_length+1])
 
-                true_path.append(batch[frame+args.seq_length+1])
+                    # salient social interaction spot
+                    # GNN component
+                    nghood_enc = helper.neighborhood_vis_loc_encoder(
+                             hidden_size=args.rnn_size,
+                             num_layers=args.num_layers,
+                             grid_size=args.grid_size,
+                             embedding_size=args.embedding_size,
+                             dropout=args.dropout)
 
-                sess.run(tf.initialize_all_variables())
-                # salient social interaction spot
-                # GNN component
-                nghood_enc = helper.neighborhood_vis_loc_encoder(
-                         hidden_size=args.rnn_size,
-                         num_layers=args.num_layers,
-                         grid_size=args.grid_size,
-                         embedding_size=args.embedding_size,
-                         dropout=args.dropout)
+                    # input_size=args.input_size,
+                    hidden_state = nghood_enc.init_hidden(len(batch_v))
 
-                # input_size=args.input_size,
-                hidden_state = nghood_enc.init_hidden(len(batch_v))
+                    # salient static spot
+                    # generate weighted embeddings of spatial context in the scene
+                    stat_ngh = helper.neighborhood_stat_enc(
+                             hidden_size=args.rnn_size,
+                             num_layers=args.num_layers,
+                             grid_size=args.grid_size,
+                             dropout=args.dropout)
 
-                # salient static spot
-                # generate weighted embeddings of spatial context in the scene
-                stat_ngh = helper.neighborhood_stat_enc(
-                         hidden_size=args.rnn_size,
-                         num_layers=args.num_layers,
-                         grid_size= args.grid_size,
-                         dropout=args.dropout)
+                    # input_size=args.input_size,
+                    st_embeddings, hidden_state = nghood_enc.forward(batch_v, hidden_state)
+                    # tf.variables_initializer(var_list=[self.weight_k, self.bias_k])
 
-                # input_size=args.input_size,
-                st_embeddings, hidden_state = nghood_enc.forward(batch_v, hidden_state)
-                # tf.variables_initializer(var_list=[self.weight_k, self.bias_k])
-                krnl_mdl = mcr.g2k_lstm_mcr(st_embeddings, out_size=batch_v.shape[1])
-                # stat_embed = grid.getSequenceGridMask(sequence= batch_v,
-                #                                       dimensions= dim,
-                #                                       neighborhood_size=args.neigborhood,
-                #                                       grid_size= args.grid_size)
+                    # sess.run(tf.initialize_all_variables())
 
-                static_mask = tf.zeros(shape=(dim, dim),
-                                               dtype=tf.float64)
-                static_mask += tf.range(start=0, limit= 1, delta=0.125, dtype=tf.float64)
-                # to become weighted mask of densest regions (interactive regions / hot-spots )
+                    # stat_embed = grid.getSequenceGridMask(sequence= batch_v,
+                    #                                       dimensions= dim,
+                    #                                       neighborhood_size=args.neigborhood,
+                    #                                       grid_size= args.grid_size)
 
-                # combined_ngh [8x4] and st_embeddings [8x2] , next use generate vislets features embeddings
-                # reach here, TODO: check if states and frequency blocks output is properly done.
-                # Pass Random Walker on this weighted features
-                combined_ngh, hidden_state = stat_ngh(input=static_mask, social_frame=st_embeddings, hidden=hidden_state)
+                    static_mask = tf.zeros(shape=(dim, dim), dtype=tf.float64)
+                    static_mask += tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64)
+                    # to become weighted mask of densest regions (interactive regions / hot-spots )
 
-                # GNN vs RW in terms of encoding graph structures into smaller pieces (atomic structures)
-                # make use of Jacobi matrix for achieving derivatives of (vector-valued function) f(x)
-                # where x_i is trajectory of pedestrian i. Jacobi matrix will be on random walk process
-                # make loss function results constrained to Jacobian matrix optimization
-                # and transform linearly or using MLP to generate
-                # derivatives of Jacobi matrix, then pass this matrix through an MLP to get the future (x,y) positions
-                # combine vislet with underlying grid embeddings
-                # the visual field will guide the kernel on how to share states between local neighborhoods
-                # accordingly, outputs from the underlying grid after sharing states, are taken as entries
-                # of kernel, forming Jacobian matrix. Transform matrix through mlp into vector of 2 entries
-                # corresponding to future locations.
-                # TODO embed vislet features with both static neighborhood and social neighborhood
-                #      using activations.
+                    # combined_ngh [8x4] and st_embeddings [8x2] , next use generate vislets features embeddings
+                    # reach here, TODO: check if states and frequency blocks output is properly done.
+                    # Pass Random Walker on this weighted features
+                    combined_ngh, hidden_state = stat_ngh(input=static_mask, social_frame=st_embeddings, hidden=hidden_state)
 
-                edge_mat = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1]))
-                
-                with tf.Session() as sess2:                    
-                    #pred_path, jacobian = krnl_mdl.forward(outputs=st_embeddings,ngh=combined_ngh, visual_path=vislet)
-                    pred_path, jacobian = sess2.run(krnl_mdl.forward, feed_dict={outputs:st_embeddings,ngh:combined_ngh, visual_path:vislet})
+                    # GNN vs RW in terms of encoding graph structures into smaller pieces (atomic structures)
+                    # make use of Jacobi matrix for achieving derivatives of (vector-valued function) f(x)
+                    # where x_i is trajectory of pedestrian i. Jacobi matrix will be on random walk process
+                    # make loss function results constrained to Jacobian matrix optimization
+                    # and transform linearly or using MLP to generate
+                    # derivatives of Jacobi matrix, then pass this matrix through an MLP to get the future (x,y) positions
+                    # combine vislet with underlying grid embeddings
+                    # the visual field will guide the kernel on how to share states between local neighborhoods
+                    # accordingly, outputs from the underlying grid after sharing states, are taken as entries
+                    # of kernel, forming Jacobian matrix. Transform matrix through mlp into vector of 2 entries
+                    # corresponding to future locations.
+                    # TODO embed vislet features with both static neighborhood and social neighborhood
+                    #      using activations.
+
+                    edge_mat = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1]))
+                    # sess.run()
+                    # with tf.Session() as sess2:
+                    krnl_mdl = mcr.g2k_lstm_mcr(st_embeddings, out_size=batch_v.shape[1],
+                                                outputs=st_embeddings,
+                                                ngh=combined_ngh,
+                                                visual_path=vislet)
+
+                    # feed = {krnl_mdl.outputs: tf.make_ndarray(st_embeddings),
+                    #         krnl_mdl.ngh: tf.make_ndarray(combined_ngh),
+                    #         krnl_mdl.visual_path: tf.make_ndarray(vislet)}
+
+                    pred_path, jacobian, = sess.run([krnl_mdl.cost], {})
+                    # pred_path, jacobian = sess.run(fetches=krnl_mdl)
+                    # pred_path, jacobian = sess.run(krnl_mdl.forward,
+                    #                         feed_dict={x:st_embeddings,
+                    #                                     y:combined_ngh,
+                    #                                     'visual_path':vislet})
+                    # jacobian = torch.Tensor(jacobian)
                     jacobian.backward()
-                # generate weighted embeddings of spatial/temporal motion features in the frame
-                # decode edge_mat embeddings into relations
-                # rlns = tf.Sigmoid(jacobian)
-                relational_loss = nri.eval_rln_ngh(nghood_enc, combined_ngh)
-                relational_loss.backward()
 
-                nx_g.online_graph.linkGraph(curr_graph=graph_t,new_edges=rlns, frame=frame)
+                    # generate weighted embeddings of spatial/temporal motion features in the frame
+                    # decode edge_mat embeddings into relations
+                    # rlns = tf.Sigmoid(jacobian)
+                    relational_loss = nri.eval_rln_ngh(nghood_enc, combined_ngh)
+                    relational_loss.backward()
 
-                # output = krnl_mdl(in_features)
-                # TODO loss type ??? suitable loss to measure
-                euc_loss = torch.norm((pred_path - true_path), p=2)
-                euc_loss.backward()
+                    nx_g.online_graph.linkGraph(curr_graph=graph_t,new_edges=rlns, frame=frame)
 
-                frame += args.seq_length
+                    # output = krnl_mdl(in_features)
+                    # TODO loss type ??? suitable loss to measure
+                    euc_loss = torch.norm((pred_path - true_path), p=2)
+                    euc_loss.backward()
 
-            krnl_mdl.save()
+                    frame += args.seq_length
+
+                krnl_mdl.save()
 
     # Validate
     # dataloader.reset_data_pointer(valid=True)
@@ -242,7 +259,6 @@ def train(args):
     # if loss_epoch < best_val_loss:
     #     best_val_loss = loss_epoch
     #     best_epoch = epoch
-
     sess.close()
 
 
