@@ -13,10 +13,14 @@ def graph_to_kernel():
 # Through gated neighborhood network (neighborhood encoders & random walker)
 def infer_rlns(adj_mat):
     # infer relationships from the kernel (kernel output by random walker algorithm)
-    prob_mat = nn.Sigmoid(adj_mat)
+    sig = nn.Sigmoid()
+    prob_mat = sig(adj_mat)
+
     return prob_mat
 
 def eval_rln_ngh(ngh, static_ngh):
     # evaluate importance of relations to form the hybrid neighborhood(social(temporal) + static(spatial))
+    # prob_mat = nn.Sigmoid(adj_mat)
+
     return
 

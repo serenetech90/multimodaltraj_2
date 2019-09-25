@@ -7,22 +7,28 @@ from tensorflow.contrib.rnn.python.ops import rnn_cell as rnn
 # https://github.com/tensorflow/tensorflow/blob/r1.8/tensorflow/contrib/rnn/python/ops/rnn_cell.py
 # implementation of GNN (Gated Neighborhood Network)
 #  we make use of peephole connections as grid lstm emerged from highway networks
-class neighborhood_vis_loc_encoder(nn.Module):
+
+class neighborhood_vis_loc_encoder():
     #  TODO code
     #     define correlation between vislets and locations and let the higher correlations define
     #     the zone of interest (region of interest that is influential to pedestrian, encode temporal features
     #     about the active hotspot/ salient interaction spot)
     #     try rnn as encoder for features
     #     for now multiple cues are concatenated.
-    def __init__(self, hidden_size, num_layers, grid_size, embedding_size,dropout=0):
-        super(neighborhood_vis_loc_encoder, self).__init__()
+    def __init__(self, hidden_size,hidden_len, num_layers, grid_size, embedding_size,dropout=0):
+        # super(neighborhood_vis_loc_encoder, self).__init__()
         # tf.Variable()
 
         init_w = tf.initializers.random_normal(mean=0, stddev=1,seed=0)
         reg_w = tf.contrib.layers.l2_regularizer(scale=0.1)
+        self.hidden_size = hidden_size
+        self.embedding_size = embedding_size
+        self.input = tf.placeholder(dtype=tf.float64, shape=[hidden_len,hidden_len], name="inputs")
+        self.hidden_state = tf.placeholder(name= 'hidden_state',shape=(hidden_len, self.hidden_size), dtype=tf.float64)
 
         # w = tf.Variable(name='weight', initial_value= init_w(shape=(2,hidden_size)),
         #             trainable=True)
+
         self.rnn = rnn.GridLSTMCell(num_units=num_layers,
                                     feature_size=grid_size,
                                     frequency_skip=grid_size,
@@ -41,15 +47,14 @@ class neighborhood_vis_loc_encoder(nn.Module):
         #                   batch_first=True, bidirectional=False, dropout=dropout)
         # self.rnn.add_weight(name='weight', shape=(2,hidden_size),
         #                     trainable=True,initializer=init_w(shape=(2,hidden_size)))
-        self.hidden_size = hidden_size
-        self.embedding_size = embedding_size
+
+        self.forward(self.input, self.hidden_state)
 
     def forward(self, input, hidden):
         # vislet, location = *input[0], *input[1]
         # Combine both features
 
         input = tf.convert_to_tensor(input, dtype=tf.float64)
-
         # hidden = tf.convert_to_tensor(hidden, dtype=tf.float64)
         # input = tf.reshape
         # input = tf.nn.relu_layer(x=input , weights=tf)
@@ -59,9 +64,9 @@ class neighborhood_vis_loc_encoder(nn.Module):
         return tf.transpose(output), tf.transpose(new_hidden)
 
     def init_hidden(self, size):
-        return tf.zeros(shape=(size, self.hidden_size), dtype=tf.float64)
+       return tf.zeros(name= 'hidden_state',shape=(size, self.hidden_size), dtype=tf.float64)
 
-class neighborhood_stat_enc(nn.Module):
+class neighborhood_stat_enc():
     # TODO code for later experiment
     #   define correlation static neighborhood and pedestrians relative distances to context
     #   run kernel over region around pedestrian to specify static context features and determine
@@ -95,11 +100,11 @@ class neighborhood_stat_enc(nn.Module):
     # to encode relative spatial interactions human-space combine both neighborhood networks,
     # the static neighborhood network encodes the poi in the scene first
     def __init__(self, hidden_size, num_layers,grid_size, dropout=0):
-        super(neighborhood_stat_enc, self).__init__()
+        # super(neighborhood_stat_enc, self).__init__()
 
         self.hidden_size = hidden_size
         # in gridLSTM frequency blocks are the units of lstm stacking vertically
-        # while time lstm spans horizontally
+        # while time LSTM spans horizontally
         self.rnn = rnn.GridLSTMCell(num_units=num_layers,
                                     feature_size=grid_size,
                                     frequency_skip=grid_size,
@@ -109,7 +114,13 @@ class neighborhood_stat_enc(nn.Module):
                                     state_is_tuple=False,
                                     couple_input_forget_gates=True,
                                     reuse=True)
+        self.static_mask = tf.placeholder()
+        self.social_frame = tf.placeholder()
+        self.hidden_state = tf.placeholder(name='hidden_state', shape=(hidden_len, self.hidden_size), dtype=tf.float64)
 
+
+
+        self.forward(self.static_mask , self.social_frame, self.hidden_state)
         # self.rnn = nn.GRUCell(input_size, hidden_size, num_layers)
         # GRUCell is stacked GRU model but it doesnt provide Grid scheme of sharing weights along multidimensional GRU
         # llua('/home/serene/PycharmProjects/multimodaltraj/grid-lstm-master/model/GridLSTM.lua')

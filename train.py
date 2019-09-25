@@ -91,35 +91,52 @@ def train(args):
     tf_graph = tf.Graph()
     with tf.Session(graph=tf_graph) as sess:
         with sess.as_default():
+            sess.run(tf.initialize_all_variables())
+
+            # saver = tf.train.Saver(tf.all_variables(), max_to_keep=None)
             print('session started')
             # dim = [720, 576]
             dim = int(args.neighborhood_size / args.grid_size)
-            # tf.enable_eager_execution()
+
+            # tf.disable_eager_execution()
             graph = nx_g.online_graph(args)
             # Train
             while i < args.num_epochs:
                 graph_t = graph.ConstructGraph(current_batch=batch, framenum=0)
+
                 for frame in range(len(batch)):
                     # check if get_node_attr gets complete sequence for all nodes
                     # num_nodes x obs_length
                     batch_v = list(graph_t.get_node_attr(param='node_pos_list').values())
                     batch_v = np.transpose(batch_v)
+                    num_nodes = batch_v.shape[1]
+
                     vislet = np.expand_dims(a=batch_v[len(batch_v) - 1], axis=0)
 
                     true_path.append(batch[frame+args.seq_length+1])
 
                     # salient social interaction spot
                     # GNN component
+                    cat = batch_v.shape[1] - batch_v.shape[0]
+                    # batch_v = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1])) + tf.convert_to_tensor(batch_v, dtype=tf.float64)
+                    batch_v = np.concatenate((batch_v, np.zeros(shape=(cat , num_nodes))),axis=0)
+
                     nghood_enc = helper.neighborhood_vis_loc_encoder(
                              hidden_size=args.rnn_size,
+                             hidden_len=len(batch_v),
                              num_layers=args.num_layers,
                              grid_size=args.grid_size,
                              embedding_size=args.embedding_size,
                              dropout=args.dropout)
 
-                    # input_size=args.input_size,
-                    hidden_state = nghood_enc.init_hidden(len(batch_v))
+                    hidden_state = np.zeros(shape=(len(batch_v), args.rnn_size))
 
+                    # hidden_state = nghood_enc.init_hidden(len(batch_v))
+                    st_embeddings, hidden_state = sess.run([nghood_enc.input , nghood_enc.hidden_state], feed_dict={nghood_enc.input:batch_v, nghood_enc.hidden_state:hidden_state})
+
+                    # st_embeddings, hidden_state = nghood_enc.forward(batch_v, hidden_state)
+                    # input_size=args.input_size,
+                    #
                     # salient static spot
                     # generate weighted embeddings of spatial context in the scene
                     stat_ngh = helper.neighborhood_stat_enc(
@@ -129,25 +146,21 @@ def train(args):
                              dropout=args.dropout)
 
                     # input_size=args.input_size,
-                    st_embeddings, hidden_state = nghood_enc.forward(batch_v, hidden_state)
                     # tf.variables_initializer(var_list=[self.weight_k, self.bias_k])
-
                     # sess.run(tf.initialize_all_variables())
-
                     # stat_embed = grid.getSequenceGridMask(sequence= batch_v,
                     #                                       dimensions= dim,
                     #                                       neighborhood_size=args.neigborhood,
                     #                                       grid_size= args.grid_size)
-
                     static_mask = tf.zeros(shape=(dim, dim), dtype=tf.float64)
                     static_mask += tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64)
-                    # to become weighted mask of densest regions (interactive regions / hot-spots )
 
+                    # to become weighted mask of densest regions (interactive regions / hot-spots )
                     # combined_ngh [8x4] and st_embeddings [8x2] , next use generate vislets features embeddings
                     # reach here, TODO: check if states and frequency blocks output is properly done.
                     # Pass Random Walker on this weighted features
-                    combined_ngh, hidden_state = stat_ngh(input=static_mask, social_frame=st_embeddings, hidden=hidden_state)
-
+                    combined_ngh, hidden_state = sess.run([stat_ngh.static_mask], feed_dict={static_mask ,st_embeddings , hidden_state})
+                    # stat_ngh.forward(input=static_mask, social_frame=st_embeddings, hidden=hidden_state)
                     # GNN vs RW in terms of encoding graph structures into smaller pieces (atomic structures)
                     # make use of Jacobi matrix for achieving derivatives of (vector-valued function) f(x)
                     # where x_i is trajectory of pedestrian i. Jacobi matrix will be on random walk process
@@ -169,12 +182,12 @@ def train(args):
                                                 outputs=st_embeddings,
                                                 ngh=combined_ngh,
                                                 visual_path=vislet)
-
                     # feed = {krnl_mdl.outputs: tf.make_ndarray(st_embeddings),
                     #         krnl_mdl.ngh: tf.make_ndarray(combined_ngh),
                     #         krnl_mdl.visual_path: tf.make_ndarray(vislet)}
-
-                    pred_path, jacobian, = sess.run([krnl_mdl.cost], {})
+                    # run tf session to get through the GridLSTM then continue with pyTorch
+                    pred_path, jacobian, _ = sess.run([st_embeddings,krnl_mdl.cost,
+                                                      combined_ngh], {})
                     # pred_path, jacobian = sess.run(fetches=krnl_mdl)
                     # pred_path, jacobian = sess.run(krnl_mdl.forward,
                     #                         feed_dict={x:st_embeddings,
