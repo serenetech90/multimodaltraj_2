@@ -132,7 +132,8 @@ def train(args):
                     hidden_state = np.zeros(shape=(len(batch_v), args.rnn_size))
 
                     # hidden_state = nghood_enc.init_hidden(len(batch_v))
-                    st_embeddings, hidden_state = sess.run([nghood_enc.input , nghood_enc.hidden_state], feed_dict={nghood_enc.input:batch_v, nghood_enc.hidden_state:hidden_state})
+                    st_embeddings, hidden_state = sess.run([nghood_enc.input , nghood_enc.hidden_state],
+                                feed_dict={nghood_enc.input:batch_v, nghood_enc.hidden_state:hidden_state})
 
                     # st_embeddings, hidden_state = nghood_enc.forward(batch_v, hidden_state)
                     # input_size=args.input_size,
@@ -143,8 +144,9 @@ def train(args):
                              hidden_size=args.rnn_size,
                              num_layers=args.num_layers,
                              grid_size=args.grid_size,
+                             dim=dim,
+                             num_nodes=num_nodes,
                              dropout=args.dropout)
-
                     # input_size=args.input_size,
                     # tf.variables_initializer(var_list=[self.weight_k, self.bias_k])
                     # sess.run(tf.initialize_all_variables())
@@ -152,14 +154,20 @@ def train(args):
                     #                                       dimensions= dim,
                     #                                       neighborhood_size=args.neigborhood,
                     #                                       grid_size= args.grid_size)
-                    static_mask = tf.zeros(shape=(dim, dim), dtype=tf.float64)
-                    static_mask += tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64)
+
+                    static_mask = tf.zeros(shape=(dim, num_nodes), dtype=tf.float64)
+                    static_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
+                    static_mask_nd = static_mask.eval()
+                    combined_ngh, hidden_state = \
+                        sess.run([stat_ngh.static_mask, hidden_state],
+                        feed_dict={stat_ngh.static_mask: static_mask_nd,
+                                   stat_ngh.social_frame: st_embeddings,
+                                   stat_ngh.hidden_size: hidden_state})
 
                     # to become weighted mask of densest regions (interactive regions / hot-spots )
                     # combined_ngh [8x4] and st_embeddings [8x2] , next use generate vislets features embeddings
                     # reach here, TODO: check if states and frequency blocks output is properly done.
                     # Pass Random Walker on this weighted features
-                    combined_ngh, hidden_state = sess.run([stat_ngh.static_mask], feed_dict={static_mask ,st_embeddings , hidden_state})
                     # stat_ngh.forward(input=static_mask, social_frame=st_embeddings, hidden=hidden_state)
                     # GNN vs RW in terms of encoding graph structures into smaller pieces (atomic structures)
                     # make use of Jacobi matrix for achieving derivatives of (vector-valued function) f(x)
@@ -202,7 +210,7 @@ def train(args):
                     relational_loss = nri.eval_rln_ngh(nghood_enc, combined_ngh)
                     relational_loss.backward()
 
-                    nx_g.online_graph.linkGraph(curr_graph=graph_t,new_edges=rlns, frame=frame)
+                    nx_g.online_graph.linkGraph(curr_graph=graph_t, new_edges=rlns, frame=frame)
 
                     # output = krnl_mdl(in_features)
                     # TODO loss type ??? suitable loss to measure

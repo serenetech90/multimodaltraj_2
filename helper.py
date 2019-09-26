@@ -24,7 +24,7 @@ class neighborhood_vis_loc_encoder():
         self.hidden_size = hidden_size
         self.embedding_size = embedding_size
         self.input = tf.placeholder(dtype=tf.float64, shape=[hidden_len,hidden_len], name="inputs")
-        self.hidden_state = tf.placeholder(name= 'hidden_state',shape=(hidden_len, self.hidden_size), dtype=tf.float64)
+        self.hidden_state = tf.placeholder(name='hidden_state',shape=(hidden_len, self.hidden_size), dtype=tf.float64)
 
         # w = tf.Variable(name='weight', initial_value= init_w(shape=(2,hidden_size)),
         #             trainable=True)
@@ -64,7 +64,7 @@ class neighborhood_vis_loc_encoder():
         return tf.transpose(output), tf.transpose(new_hidden)
 
     def init_hidden(self, size):
-       return tf.zeros(name= 'hidden_state',shape=(size, self.hidden_size), dtype=tf.float64)
+       return tf.zeros(name='hidden_state',shape=(size, self.hidden_size), dtype=tf.float64)
 
 class neighborhood_stat_enc():
     # TODO code for later experiment
@@ -99,7 +99,7 @@ class neighborhood_stat_enc():
     # try grid lstm cell in place of cnn to encode spatial features
     # to encode relative spatial interactions human-space combine both neighborhood networks,
     # the static neighborhood network encodes the poi in the scene first
-    def __init__(self, hidden_size, num_layers,grid_size, dropout=0):
+    def __init__(self, hidden_size, num_layers,grid_size, dim, num_nodes,dropout=0):
         # super(neighborhood_stat_enc, self).__init__()
 
         self.hidden_size = hidden_size
@@ -114,11 +114,10 @@ class neighborhood_stat_enc():
                                     state_is_tuple=False,
                                     couple_input_forget_gates=True,
                                     reuse=True)
-        self.static_mask = tf.placeholder()
-        self.social_frame = tf.placeholder()
-        self.hidden_state = tf.placeholder(name='hidden_state', shape=(hidden_len, self.hidden_size), dtype=tf.float64)
 
-
+        self.static_mask = tf.placeholder(name='static_mask', shape=(dim,num_nodes), dtype=tf.float64)
+        self.social_frame = tf.placeholder(name='social_frame', shape=(num_nodes,num_nodes), dtype=tf.float64)
+        self.hidden_state = tf.placeholder(name='hidden_state', shape=(dim,hidden_size), dtype=tf.float64)
 
         self.forward(self.static_mask , self.social_frame, self.hidden_state)
         # self.rnn = nn.GRUCell(input_size, hidden_size, num_layers)
@@ -136,7 +135,7 @@ class neighborhood_stat_enc():
         # evaluate occupancy inside each local neighborhood
 
         input = tf.matmul(a=input, b=social_frame)# Soft-attention mechanism equipped with static grid
-        output, new_hidden = self.rnn(inputs=tf.transpose(input),
-                                      state=tf.transpose(hidden))
+        input = tf.matmul(input, tf.ones_like(tf.transpose(input)))
+        output, new_hidden = self.rnn(inputs=input, state=hidden)
 
         return output, new_hidden
