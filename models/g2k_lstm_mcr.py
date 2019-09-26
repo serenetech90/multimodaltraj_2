@@ -14,9 +14,9 @@ class g2k_lstm_mcr():
         # self.relu = tf.nn.relu_layer()
         self.out_size = out_size
 
-        self.outputs = tf.Variable(initial_value=outputs,dtype=tf.float64, shape=[in_features.shape[0].value,2], name="outputs")
-        self.ngh = tf.Variable(initial_value=ngh,dtype=tf.float64, shape=[2,in_features.shape[0].value/2], name="ngh")
-        self.visual_path = tf.Variable(initial_value=visual_path,dtype=tf.float64, shape=[1,out_size], name="visual_path")
+        self.outputs = tf.placeholder(initial_value=outputs,dtype=tf.float64, shape=[in_features.shape[0].value,2], name="outputs")
+        self.ngh = tf.placeholder(initial_value=ngh,dtype=tf.float64, shape=[2,in_features.shape[0].value/2], name="ngh")
+        self.visual_path = tf.placeholder(initial_value=visual_path,dtype=tf.float64, shape=[1,out_size], name="visual_path")
 
         self.init_w = tf.initializers.random_normal(mean=0, stddev=1,seed=0,dtype=tf.float64)
 

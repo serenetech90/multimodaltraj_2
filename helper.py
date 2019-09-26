@@ -117,7 +117,7 @@ class neighborhood_stat_enc():
 
         self.static_mask = tf.placeholder(name='static_mask', shape=(dim,num_nodes), dtype=tf.float64)
         self.social_frame = tf.placeholder(name='social_frame', shape=(num_nodes,num_nodes), dtype=tf.float64)
-        self.hidden_state = tf.placeholder(name='hidden_state', shape=(dim,hidden_size), dtype=tf.float64)
+        self.hidden_state = tf.placeholder(name='hidden_state', shape=(num_nodes,hidden_size), dtype=tf.float64)
 
         self.forward(self.static_mask , self.social_frame, self.hidden_state)
         # self.rnn = nn.GRUCell(input_size, hidden_size, num_layers)
@@ -135,7 +135,8 @@ class neighborhood_stat_enc():
         # evaluate occupancy inside each local neighborhood
 
         input = tf.matmul(a=input, b=social_frame)# Soft-attention mechanism equipped with static grid
-        input = tf.matmul(input, tf.ones_like(tf.transpose(input)))
+        # input = tf.matmul(input, tf.ones_like(tf.transpose(input)))
+        input = tf.transpose(input)
         output, new_hidden = self.rnn(inputs=input, state=hidden)
 
         return output, new_hidden

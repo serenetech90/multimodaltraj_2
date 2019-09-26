@@ -155,14 +155,14 @@ def train(args):
                     #                                       neighborhood_size=args.neigborhood,
                     #                                       grid_size= args.grid_size)
 
-                    static_mask = tf.zeros(shape=(dim, num_nodes), dtype=tf.float64)
-                    static_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
-                    static_mask_nd = static_mask.eval()
+                    stat_mask = tf.zeros(shape=(dim, num_nodes), dtype=tf.float64)
+                    stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
+                    static_mask_nd = stat_mask.eval()
                     combined_ngh, hidden_state = \
-                        sess.run([stat_ngh.static_mask, hidden_state],
+                        sess.run([stat_ngh.static_mask, stat_ngh.hidden_state],
                         feed_dict={stat_ngh.static_mask: static_mask_nd,
                                    stat_ngh.social_frame: st_embeddings,
-                                   stat_ngh.hidden_size: hidden_state})
+                                   stat_ngh.hidden_state: hidden_state})
 
                     # to become weighted mask of densest regions (interactive regions / hot-spots )
                     # combined_ngh [8x4] and st_embeddings [8x2] , next use generate vislets features embeddings
