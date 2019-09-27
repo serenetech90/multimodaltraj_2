@@ -204,12 +204,11 @@ def train(args):
                     #                                     'visual_path':vislet})
                     # jacobian = torch.Tensor(jacobian)
                     # jacobian.backward()
-
                     # generate weighted embeddings of spatial/temporal motion features in the frame
                     # decode edge_mat embeddings into relations
                     # rlns = tf.Sigmoid(jacobian)
-                    relational_loss = nri.eval_rln_ngh(nghood_enc, combined_ngh)
-                    relational_loss.backward()
+                    adj_mat = nri.eval_rln_ngh(jacobian, combined_ngh)
+                    # relational_loss.backward()
 
                     nx_g.online_graph.linkGraph(curr_graph=graph_t, new_edges=rlns, frame=frame)
 
