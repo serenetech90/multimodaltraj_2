@@ -18,9 +18,11 @@ def infer_rlns(adj_mat):
 
     return prob_mat
 
-def eval_rln_ngh(ngh, static_ngh):
+def eval_rln_ngh(adj_mat, socialngh, static_ngh):
     # evaluate importance of relations to form the hybrid neighborhood(social(temporal) + static(spatial))
     # prob_mat = nn.Sigmoid(adj_mat)
+    sig = nn.Sigmoid()
+    prob_mat = sig(adj_mat)
 
     return
 

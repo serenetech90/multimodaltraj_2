@@ -20,7 +20,7 @@ def main():
                         help='size of RNN hidden state')
     # TODO: (improve) Number of layers not used. Only a single layer implemented
     # Number of layers parameter
-    parser.add_argument('--num_layers', type=int, default=1,
+    parser.add_argument('--num_layers', type=int, default=2,
                         help='number of layers in the RNN')
     # Model currently not used. Only LSTM implemented
     # Type of recurrent unit parameter
@@ -186,23 +186,24 @@ def train(args):
                     edge_mat = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1]))
                     # sess.run()
                     # with tf.Session() as sess2:
-                    krnl_mdl = mcr.g2k_lstm_mcr(st_embeddings, out_size=batch_v.shape[1],
-                                                outputs=st_embeddings,
-                                                ngh=combined_ngh,
-                                                visual_path=vislet)
+                    krnl_mdl = mcr.g2k_lstm_mcr(st_embeddings, out_size=batch_v.shape[1])
+                    # combined_ngh_nd = combined_ngh.eval()
                     # feed = {krnl_mdl.outputs: tf.make_ndarray(st_embeddings),
                     #         krnl_mdl.ngh: tf.make_ndarray(combined_ngh),
                     #         krnl_mdl.visual_path: tf.make_ndarray(vislet)}
                     # run tf session to get through the GridLSTM then continue with pyTorch
-                    pred_path, jacobian, _ = sess.run([st_embeddings,krnl_mdl.cost,
-                                                      combined_ngh], {})
+                    pred_path, jacobian = sess.run([krnl_mdl.pred_path_band,krnl_mdl.cost],
+                                               {krnl_mdl.outputs: st_embeddings,
+                                                krnl_mdl.ngh: combined_ngh,
+                                                krnl_mdl.visual_path: vislet})
+
                     # pred_path, jacobian = sess.run(fetches=krnl_mdl)
                     # pred_path, jacobian = sess.run(krnl_mdl.forward,
                     #                         feed_dict={x:st_embeddings,
                     #                                     y:combined_ngh,
                     #                                     'visual_path':vislet})
                     # jacobian = torch.Tensor(jacobian)
-                    jacobian.backward()
+                    # jacobian.backward()
 
                     # generate weighted embeddings of spatial/temporal motion features in the frame
                     # decode edge_mat embeddings into relations
