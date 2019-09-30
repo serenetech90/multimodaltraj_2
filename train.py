@@ -114,7 +114,6 @@ def train(args):
                     vislet = np.expand_dims(a=batch_v[len(batch_v) - 1], axis=0)
 
                     true_path.append(batch[frame+args.seq_length+1])
-
                     # salient social interaction spot
                     # GNN component
                     cat = batch_v.shape[1] - batch_v.shape[0]
@@ -137,7 +136,6 @@ def train(args):
 
                     # st_embeddings, hidden_state = nghood_enc.forward(batch_v, hidden_state)
                     # input_size=args.input_size,
-                    #
                     # salient static spot
                     # generate weighted embeddings of spatial context in the scene
                     stat_ngh = helper.neighborhood_stat_enc(
@@ -182,18 +180,22 @@ def train(args):
                     # corresponding to future locations.
                     # TODO embed vislet features with both static neighborhood and social neighborhood
                     #      using activations.
-
-                    edge_mat = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1]))
+                    # edge_mat = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1]))
                     # sess.run()
                     # with tf.Session() as sess2:
-                    krnl_mdl = mcr.g2k_lstm_mcr(st_embeddings, out_size=batch_v.shape[1])
+
+                    krnl_mdl = mcr.g2k_lstm_mcr(st_embeddings, out_size=batch_v.shape[1],
+                                                lambda_reg=args.lambda_param)
                     # combined_ngh_nd = combined_ngh.eval()
                     # feed = {krnl_mdl.outputs: tf.make_ndarray(st_embeddings),
                     #         krnl_mdl.ngh: tf.make_ndarray(combined_ngh),
                     #         krnl_mdl.visual_path: tf.make_ndarray(vislet)}
                     # run tf session to get through the GridLSTM then continue with pyTorch
-                    pred_path, jacobian = sess.run([krnl_mdl.pred_path_band,krnl_mdl.cost],
-                                               {krnl_mdl.outputs: st_embeddings,
+
+                    # krnl_mdl.cost is our relational loss (its loss related to having lower regression curve compared to the all-ones edge matrix)
+                    # logistic regression
+                    pred_path, jacobian = sess.run([krnl_mdl.pred_path_band,krnl_mdl.cost, krnl_mdl.weight_k],
+                                               {krnl_mdl.outputs: np.concatenate((st_embeddings,vislet), axis=0),
                                                 krnl_mdl.ngh: combined_ngh,
                                                 krnl_mdl.visual_path: vislet})
 
@@ -207,11 +209,11 @@ def train(args):
                     # generate weighted embeddings of spatial/temporal motion features in the frame
                     # decode edge_mat embeddings into relations
                     # rlns = tf.Sigmoid(jacobian)
+
                     adj_mat = nri.eval_rln_ngh(jacobian, combined_ngh)
+
                     # relational_loss.backward()
-
-                    nx_g.online_graph.linkGraph(curr_graph=graph_t, new_edges=rlns, frame=frame)
-
+                    # nx_g.online_graph.linkGraph(curr_graph=graph_t, new_edges=rlns, frame=frame)
                     # output = krnl_mdl(in_features)
                     # TODO loss type ??? suitable loss to measure
                     euc_loss = torch.norm((pred_path - true_path), p=2)

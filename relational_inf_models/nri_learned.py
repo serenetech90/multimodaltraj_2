@@ -1,4 +1,6 @@
-import torch.nn as nn
+# import torch.nn as nn
+import tensorflow.nn as nn
+import torch
 
 def graph_to_kernel():
     # TODO construct kernel from random walk theory
@@ -21,8 +23,7 @@ def infer_rlns(adj_mat):
 def eval_rln_ngh(adj_mat, combined_ngh):
     # evaluate importance of relations to form the hybrid neighborhood(social(temporal) + static(spatial))
     # prob_mat = nn.Sigmoid(adj_mat)
-    sig = nn.Sigmoid()
-    prob_mat = sig(adj_mat)
+    prob_mat = nn.softmax(adj_mat)
 
-    return
+    return prob_mat
 
