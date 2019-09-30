@@ -26,10 +26,9 @@ class g2k_lstm_mcr():
 
         self.init_w = tf.initializers.random_normal(mean=0, stddev=1,seed=0,dtype=tf.float64)
 
-        self.weight_k = tf.Variable(name='weight_k', initial_value= \
-                                self.init_w(shape=(8, 16)),
-                                # shape=tf.shape(1,in_features.shape[1].value),
-                                dtype=tf.float64)
+        self.weight_k = tf.Variable(name='weight_k',
+                                    initial_value=self.init_w(shape=(8, 16)),
+                                    dtype=tf.float64)
 
         self.bias_k = tf.Variable(name='bias_k', initial_value= \
                                   self.init_w(shape=(in_features.shape[0],)),

@@ -152,16 +152,15 @@ def train(args):
                     #                                       dimensions= dim,
                     #                                       neighborhood_size=args.neigborhood,
                     #                                       grid_size= args.grid_size)
-
                     stat_mask = tf.zeros(shape=(dim, num_nodes), dtype=tf.float64)
                     stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
                     static_mask_nd = stat_mask.eval()
+
                     combined_ngh, hidden_state = \
                         sess.run([stat_ngh.static_mask, stat_ngh.hidden_state],
                         feed_dict={stat_ngh.static_mask: static_mask_nd,
                                    stat_ngh.social_frame: st_embeddings,
                                    stat_ngh.hidden_state: hidden_state})
-
                     # to become weighted mask of densest regions (interactive regions / hot-spots )
                     # combined_ngh [8x4] and st_embeddings [8x2] , next use generate vislets features embeddings
                     # reach here, TODO: check if states and frequency blocks output is properly done.
@@ -183,7 +182,6 @@ def train(args):
                     # edge_mat = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1]))
                     # sess.run()
                     # with tf.Session() as sess2:
-
                     krnl_mdl = mcr.g2k_lstm_mcr(st_embeddings, out_size=batch_v.shape[1],
                                                 lambda_reg=args.lambda_param)
                     # combined_ngh_nd = combined_ngh.eval()
@@ -194,11 +192,10 @@ def train(args):
 
                     # krnl_mdl.cost is our relational loss (its loss related to having lower regression curve compared to the all-ones edge matrix)
                     # logistic regression
-                    pred_path, jacobian = sess.run([krnl_mdl.pred_path_band,krnl_mdl.cost, krnl_mdl.weight_k],
+                    pred_path, jacobian = sess.run([krnl_mdl.pred_path_band,krnl_mdl.cost],
                                                {krnl_mdl.outputs: np.concatenate((st_embeddings,vislet), axis=0),
                                                 krnl_mdl.ngh: combined_ngh,
                                                 krnl_mdl.visual_path: vislet})
-
                     # pred_path, jacobian = sess.run(fetches=krnl_mdl)
                     # pred_path, jacobian = sess.run(krnl_mdl.forward,
                     #                         feed_dict={x:st_embeddings,
