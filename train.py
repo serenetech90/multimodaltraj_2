@@ -152,9 +152,12 @@ def train(args):
                     #                                       dimensions= dim,
                     #                                       neighborhood_size=args.neigborhood,
                     #                                       grid_size= args.grid_size)
+
                     stat_mask = tf.zeros(shape=(dim, num_nodes), dtype=tf.float64)
                     stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
                     static_mask_nd = stat_mask.eval()
+
+                    # tf.initialize_all_variables().run()
 
                     combined_ngh, hidden_state = \
                         sess.run([stat_ngh.static_mask, stat_ngh.hidden_state],
@@ -183,6 +186,7 @@ def train(args):
                     # sess.run()
                     # with tf.Session() as sess2:
                     krnl_mdl = mcr.g2k_lstm_mcr(st_embeddings, out_size=batch_v.shape[1],
+                                                obs_len=args.seq_length,
                                                 lambda_reg=args.lambda_param)
                     # combined_ngh_nd = combined_ngh.eval()
                     # feed = {krnl_mdl.outputs: tf.make_ndarray(st_embeddings),

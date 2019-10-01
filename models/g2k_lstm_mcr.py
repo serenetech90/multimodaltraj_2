@@ -9,7 +9,7 @@ from torch.nn import functional as F
 import torch.cuda
 
 class g2k_lstm_mcr():
-    def __init__(self, in_features, out_size, lambda_reg):
+    def __init__(self, in_features, out_size, obs_len, lambda_reg):
         # super(g2k_lstm_mcr).__init__()
         # self.relu = tf.nn.relu_layer()
         self.out_size = out_size
@@ -26,14 +26,14 @@ class g2k_lstm_mcr():
 
         self.init_w = tf.initializers.random_normal(mean=0, stddev=1,seed=0,dtype=tf.float64)
 
-        self.weight_k = tf.Variable(name='weight_k',
-                                    initial_value=self.init_w(shape=(8, 16)),
+        self.weight_c = tf.Variable(name='weight_k',
+                                    initial_value=self.init_w(shape=(obs_len, 16)),
                                     dtype=tf.float64)
 
-        self.bias_k = tf.Variable(name='bias_k', initial_value= \
-                                  self.init_w(shape=(in_features.shape[0],)),
-                                  # shape=(in_features.shape[1].value, 1),
-                                  dtype=tf.float64)
+        # self.bias_k = tf.Variable(name='bias_k', initial_value= \
+        #                           self.init_w(shape=(in_features.shape[0],)),
+        #                           # shape=(in_features.shape[1].value, 1),
+        #                           dtype=tf.float64)
 
         self.weight_v = tf.Variable(name='weight_v', initial_value= \
             self.init_w(shape=(8,in_features.shape[0]+1)),
@@ -85,7 +85,7 @@ class g2k_lstm_mcr():
         self.cost = tf.transpose(self.cost)
         # self.cost = tf.matmul(self.ngh, self.outputs)
 
-        temp_path = tf.matmul(self.cost, self.weight_k)
+        temp_path = tf.matmul(self.cost, self.weight_c)
 
         self.pred_path_band = tf.reshape(temp_path, (2, 8, self.outputs.shape[1]))
 
