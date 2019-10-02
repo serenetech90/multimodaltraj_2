@@ -16,9 +16,10 @@ class g2k_lstm_mcr():
         self.lambda_reg = tf.Variable(lambda_reg, dtype=tf.float64)
 
         self.outputs = tf.placeholder(dtype=tf.float64,
-                                      shape=[in_features.shape[0]+1,in_features.shape[0]],name="outputs")
+                                      shape=[int(in_features.shape[0])+1,
+                                             int(in_features.shape[0])],name="outputs")
         self.ngh = tf.placeholder(dtype=tf.float64,
-                                  shape=[8, in_features.shape[0]], name="ngh")
+                                  shape=[8, int(in_features.shape[0])], name="ngh")
         self.visual_path = tf.placeholder(dtype=tf.float64,
                                           shape=[1, out_size], name="visual_path")
         self.pred_path_band = tf.placeholder(dtype=tf.float64,
@@ -26,26 +27,25 @@ class g2k_lstm_mcr():
 
         self.init_w = tf.initializers.random_normal(mean=0, stddev=1,seed=0,dtype=tf.float64)
 
-        self.weight_c = tf.Variable(name='weight_k',
-                                    initial_value=self.init_w(shape=(obs_len, 16)),
-                                    dtype=tf.float64)
-
         # self.bias_k = tf.Variable(name='bias_k', initial_value= \
         #                           self.init_w(shape=(in_features.shape[0],)),
         #                           # shape=(in_features.shape[1].value, 1),
         #                           dtype=tf.float64)
-
         self.weight_v = tf.Variable(name='weight_v', initial_value= \
-            self.init_w(shape=(8,in_features.shape[0]+1)),
+            self.init_w(shape=(8,int(in_features.shape[0])+1)),
             # shape=tf.shape(1,in_features.shape[1].value),
             dtype=tf.float64)
-
         self.bias_v = tf.Variable(name='bias_v', initial_value= \
-            self.init_w(shape=(in_features.shape[0],)),
+            self.init_w(shape=(int(in_features.shape[0]),)),
+            # shape=tf.shape(1,in_features.shape[1].value),
+            dtype=tf.float64)
+        self.weight_c = tf.Variable(name='weight_c', initial_value= \
+            self.init_w(shape=(16, obs_len)),
             # shape=tf.shape(1,in_features.shape[1].value),
             dtype=tf.float64)
 
-        self.pred_path, self.cost = self.forward()
+        self.forward()
+        # self.pred_path, self.cost = self.forward()
         # self.pred_path, self.cost = self.forward(self.outputs,self.ngh, self.visual_path)
         # def randomWalker(self, in_features, w, b):
         #
@@ -77,23 +77,22 @@ class g2k_lstm_mcr():
         # compute neighborhood as a function of the social and spatial features
         # determined by social embedded features.
 
-        ys_temp = tf.zeros_like(self.ngh)
+        # ys_temp = tf.zeros_like(self.ngh)
 
         self.cost = tf.gradients(ys=ngh_temp, xs=embedded_spatial_vislet, unconnected_gradients='zero')
         self.cost = tf.squeeze(self.cost)
         self.cost = tf.nn.relu(self.cost)
-        self.cost = tf.transpose(self.cost)
+        # self.cost = tf.transpose(self.cost)
         # self.cost = tf.matmul(self.ngh, self.outputs)
 
-        temp_path = tf.matmul(self.cost, self.weight_c)
+        temp_path = tf.Variable(tf.matmul(self.weight_c, self.cost))
 
-        self.pred_path_band = tf.reshape(temp_path, (2, 8, self.outputs.shape[1]))
+        self.pred_path_band = tf.reshape(temp_path, (2, 8, int(self.outputs.shape[1])))
 
         # pred_path_band = tf.matmul(self.weight_k, tf.squeeze(self.cost)) + self.bias_k
         # pred_path_band = tf.nn.xw_plus_b(x=tf.transpose(d_outputs), weights=self.weight_k, biases=self.bias_k)
         # estimate gradient of every pedestrian function using Jacobian (matrix calculus).
-
-        return self.pred_path_band, self.cost
+        # return self.pred_path_band, self.cost
         # return np.array(pred_path_band), np.array(d_outputs)
 
     def backward(self):

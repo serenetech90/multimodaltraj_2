@@ -27,7 +27,7 @@ class online_graph():
         self.edges = [{}]
         self.onlineGraph = Graph()
 
-    def ConstructGraph(self, current_batch, framenum, stateful=True, valid=False):
+    def ConstructGraph(self, current_batch, future_traj, framenum, stateful=True, valid=False):
         self.onlineGraph.step = framenum
 
         if valid:
@@ -38,7 +38,7 @@ class online_graph():
 
                 node = Node(node_id, node_pos_list)
                 if framenum > 0 and framenum % 8:
-                    node.setTargets(seq=pos)
+                    node.setTargets(seq=future_traj[pedID])
                 self.onlineGraph.setNodes(framenum, node)
         else:
             for idx in current_batch:
@@ -54,6 +54,11 @@ class online_graph():
                         node_pos_list = pos
                         # if self.node:
                         node = Node(node_id, node_pos_list)
+                        # if framenum > 8 and framenum % 8 == 1:
+                        if len(future_traj[pedID][framenum:framenum+8]) < 8:
+                            node.setTargets(future_traj[pedID])
+                        else:
+                            node.setTargets(seq=future_traj[pedID][framenum:framenum+8])
                         self.onlineGraph.setNodes(framenum, node)
 
         self.onlineGraph.dist_mat = torch.zeros(len(self.nodes), len(self.nodes))

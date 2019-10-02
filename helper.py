@@ -33,7 +33,7 @@ class neighborhood_vis_loc_encoder():
                                     feature_size=grid_size,
                                     frequency_skip=grid_size,
                                     use_peepholes=True,
-                                    num_frequency_blocks=[grid_size],
+                                    num_frequency_blocks=[grid_size/2],
                                     share_time_frequency_weights=True,
                                     state_is_tuple=False,
                                     couple_input_forget_gates=True,
@@ -50,11 +50,15 @@ class neighborhood_vis_loc_encoder():
 
         self.forward(self.input, self.hidden_state)
 
+    def update_input_size(self, new_size):
+        self.input = tf.placeholder(dtype=tf.float64, shape=[new_size, new_size], name="inputs")
+        self.hidden_state = tf.placeholder(name='hidden_state', shape=(hidden_len, self.hidden_size), dtype=tf.float64)
+
     def forward(self, input, hidden):
         # vislet, location = *input[0], *input[1]
         # Combine both features
 
-        input = tf.convert_to_tensor(input, dtype=tf.float64)
+        self.input = tf.convert_to_tensor(input, dtype=tf.float64)
         # hidden = tf.convert_to_tensor(hidden, dtype=tf.float64)
         # input = tf.reshape
         # input = tf.nn.relu_layer(x=input , weights=tf)

@@ -60,6 +60,7 @@ class DataLoader():
         self.batch_size = args.batch_size
         self.seq_length = args.seq_length
         self.pred_len = args.pred_len
+        self.obs_len = args.seq_length
         self.diff = self.seq_length
 
         # Validation arguments
@@ -90,7 +91,7 @@ class DataLoader():
 
         # Load the processed data from the pickle file
         self.load_trajectories(self.current_dir + 'trajectories_{0}.cpkl'.format(int(self.dataset_pointer)))
-
+        self.num_batches = int((len(self.frameList)/self.seq_length)/self.batch_size)
 
     def load_trajectories(self, data_file):
         ''' Load set of pre-processed trajectories from pickled file '''
@@ -118,55 +119,65 @@ class DataLoader():
         self.seed = self.frameList[0]
         self.frame_pointer = self.seed
 
-    def next_step(self, targets=[]):
+    def next_step(self, targets={}):
         '''
         Function to get the next batch of points
         '''
         # Source data
         x_batch = {}
         # Iteration index
-        i = -1
+        b = -1
         max_idx = max(self.frameList)
         # unique_frames = np.unique(self.frameList)
 
         max_log = math.log(max_idx, self.seq_length)
-
-        while i < self.batch_size:
-            i += 1
+        idx = self.frame_pointer
+        while b < self.batch_size:
+            b += 1
             # Get the frame pointer for the current dataset
-            idx = self.frame_pointer
             # While there is still seq_length number of frames left in the current dataset
             # treat frames list indices as arithmetic series
-            c = (max_idx - (idx + self.seq_length))
+            c = (max_idx - (idx + 1))
             if c <= 0:
                 break
             else:
                 c = math.log(abs(c), self.diff)
             if c <= max_log:
                 # All the data in this sequence
-                try:
+                # try:
+                for idx in range(int(self.frame_pointer), int(self.frame_pointer+self.obs_len+1)):
                     source_frame = self.trajectories[idx]
                     # Number of unique peds in this sequence of frames
                     if len(source_frame):
                         x_batch[idx] = source_frame
-                        idx_c = idx
-                        for i in range(int(self.pred_len)):
-                            if self.trajectories[idx_c] not in targets:
-                                targets.append(self.trajectories[idx_c])
-                                if idx_c + self.pred_len <= max_idx:
-                                    idx_c += self.diff  # self.pred_len
-                    else:
-                        self.tick_frame_pointer(valid=False, incr=self.diff)
-                        continue
-                except KeyError:
-                    self.tick_frame_pointer(valid=False, incr=self.diff)
-                    continue
-
+                        if idx % self.obs_len == 0:
+                            idx_c = idx
+                            for i in range(int(self.pred_len)):
+                                idx_c += 1
+                                for j in range(len(self.trajectories[idx_c])):
+                                    # if self.trajectories[idx_c] not in targets:
+                                    (id, pos), = self.trajectories[idx_c][j].items()
+                                    if len(targets) == 0:
+                                        targets = {int(id): [pos]}
+                                    elif int(id) not in targets:
+                                        targets.update({int(id): [pos]})
+                                    else:
+                                        targets[int(id)].append(pos)
+                    # idx += 1
                 self.frame_pointer += self.seq_length
             else:
                 self.tick_frame_pointer(valid=False)
 
         return x_batch, targets, self.frame_pointer #, d
+
+    # if idx_c + self.pred_len <= max_idx:
+    #     idx_c += 1 # self.pred_len
+    # else:
+    #     self.tick_frame_pointer(valid=False, incr=self.diff)
+    #     continue
+    # except KeyError:
+    #     self.tick_frame_pointer(valid=False, incr=self.diff)
+    #     continue
 
     def frame_preprocess(self,  data_file, seed=0):
         '''
