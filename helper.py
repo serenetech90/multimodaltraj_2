@@ -19,15 +19,12 @@ class neighborhood_vis_loc_encoder():
         # super(neighborhood_vis_loc_encoder, self).__init__()
         # tf.Variable()
 
-        init_w = tf.initializers.random_normal(mean=0, stddev=1,seed=0)
         reg_w = tf.contrib.layers.l2_regularizer(scale=0.1)
         self.hidden_size = hidden_size
         self.embedding_size = embedding_size
         self.input = tf.placeholder(dtype=tf.float64, shape=[hidden_len,hidden_len], name="inputs")
         self.hidden_state = tf.placeholder(name='hidden_state',shape=(hidden_len, self.hidden_size), dtype=tf.float64)
 
-        # w = tf.Variable(name='weight', initial_value= init_w(shape=(2,hidden_size)),
-        #             trainable=True)
 
         self.rnn = rnn.GridLSTMCell(num_units=num_layers,
                                     feature_size=grid_size,
@@ -48,24 +45,25 @@ class neighborhood_vis_loc_encoder():
         # self.rnn.add_weight(name='weight', shape=(2,hidden_size),
         #                     trainable=True,initializer=init_w(shape=(2,hidden_size)))
 
-        self.forward(self.input, self.hidden_state)
+        self.forward(self.input)
 
     def update_input_size(self, new_size):
         self.input = tf.placeholder(dtype=tf.float64, shape=[new_size, new_size], name="inputs")
-        self.hidden_state = tf.placeholder(name='hidden_state', shape=(hidden_len, self.hidden_size), dtype=tf.float64)
+        self.hidden_state = tf.placeholder(name='hidden_state', shape=(new_size, self.hidden_size), dtype=tf.float64)
 
-    def forward(self, input, hidden):
+    def forward(self, input):
         # vislet, location = *input[0], *input[1]
         # Combine both features
-
-        self.input = tf.convert_to_tensor(input, dtype=tf.float64)
         # hidden = tf.convert_to_tensor(hidden, dtype=tf.float64)
         # input = tf.reshape
         # input = tf.nn.relu_layer(x=input , weights=tf)
 
-        output, new_hidden = self.rnn(inputs=input,state=hidden)
+        self.input, self.hidden_state = self.rnn(inputs=input,state=self.hidden_state)
+        # self.input = tf.transpose(output)
+        # self.hidden_state = tf.transpose(hidden_state)
+
         # transform from tf class to Pytorch tensors signature
-        return tf.transpose(output), tf.transpose(new_hidden)
+        # return tf.transpose(output), tf.transpose(new_hidden)
 
     def init_hidden(self, size):
        return tf.zeros(name='hidden_state',shape=(size, self.hidden_size), dtype=tf.float64)

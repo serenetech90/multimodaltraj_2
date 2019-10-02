@@ -104,24 +104,24 @@ def train(args):
             batch_v = list(graph_t.get_node_attr(param='node_pos_list').values())
             batch_v = np.transpose(batch_v)
             num_nodes = batch_v.shape[1]
-
-            vislet = np.expand_dims(a=batch_v[len(batch_v) - 1], axis=0)
+            # TODO augment vislets later
+            vislet = np.expand_dims(a=batch_v[0], axis=0)
 
             # salient social interaction spot
             # GNN component
-            cat = batch_v.shape[1] - batch_v.shape[0]
+            # cat = batch_v.shape[1] - batch_v.shape[0]
             # batch_v = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1])) + tf.convert_to_tensor(batch_v, dtype=tf.float64)
-            batch_v = np.concatenate((batch_v, np.zeros(shape=(cat, num_nodes))), axis=0)
+            # batch_v = np.concatenate((batch_v, np.zeros(shape=(cat, num_nodes))), axis=0)
 
             nghood_enc = helper.neighborhood_vis_loc_encoder(
                 hidden_size=args.rnn_size,
-                hidden_len=len(batch_v),
+                hidden_len=batch_v.shape[1],
                 num_layers=args.num_layers,
                 grid_size=args.grid_size,
                 embedding_size=args.embedding_size,
                 dropout=args.dropout)
 
-            hidden_state = np.zeros(shape=(len(batch_v), args.rnn_size))
+            hidden_state = np.zeros(shape=(batch_v.shape[1], args.rnn_size))
 
             stat_ngh = helper.neighborhood_stat_enc(
                 hidden_size=args.rnn_size,
@@ -148,6 +148,12 @@ def train(args):
             # Train
             while e < args.num_epochs:
                 for b in range(dataloader.num_batches):
+                    with tf.variable_scope('weight_input'):
+                        init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
+                        weight_i = tf.Variable(name='weight_i', initial_value=init_w(shape=(num_nodes, 2)),
+                                                    trainable=True, dtype=tf.float64)
+
+                    tf.initialize_variables(var_list=[weight_i]).run()
                     for i in range(start, end):
                         # check if get_node_attr gets complete sequence for all nodes
                         # num_nodes x obs_length
@@ -163,9 +169,12 @@ def train(args):
                         # if len(batch_v) != nghood_enc.input.shape[0]:
                         #     nghood_enc.update_input_size(new_size=len(batch_v))
                         # hidden_state = nghood_enc.init_hidden(len(batch_v))
+                        inputs = tf.convert_to_tensor(batch_v, dtype=tf.float64)
+                        inputs = tf.matmul(weight_i, inputs)
+
                         st_embeddings , hidden_state =\
                             sess.run([nghood_enc.input , nghood_enc.hidden_state],
-                                    feed_dict={nghood_enc.input:batch_v, nghood_enc.hidden_state:hidden_state})
+                                    feed_dict={nghood_enc.input:inputs.eval(), nghood_enc.hidden_state:hidden_state})
 
                         # st_embeddings, hidden_state = nghood_enc.forward(batch_v, hidden_state)
                         # input_size=args.input_size,
@@ -178,8 +187,6 @@ def train(args):
                         #                                       dimensions= dim,
                         #                                       neighborhood_size=args.neigborhood,
                         #                                       grid_size= args.grid_size)
-
-
                         # tf.initialize_all_variables().run()
                         # st_embeddings = nghood_enc.input
                         combined_ngh, hidden_state = \
@@ -263,22 +270,22 @@ def train(args):
                     batch_v = np.transpose(batch_v)
                     num_nodes = batch_v.shape[1]
 
-                    vislet = np.expand_dims(a=batch_v[len(batch_v) - 1], axis=0)
+                    vislet = np.expand_dims(a=batch_v[batch_v.shape[1] - 1], axis=0)
 
                     # salient social interaction spot
                     # GNN component
-                    cat = batch_v.shape[1] - batch_v.shape[0]
+                    # cat = batch_v.shape[1] - batch_v.shape[0]
                     # batch_v = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1])) + tf.convert_to_tensor(batch_v, dtype=tf.float64)
-                    batch_v = np.concatenate((batch_v, np.zeros(shape=(cat, num_nodes))), axis=0)
+                    # batch_v = np.concatenate((batch_v, np.zeros(shape=(cat, num_nodes))), axis=0)
                     nghood_enc = helper.neighborhood_vis_loc_encoder(
                         hidden_size=args.rnn_size,
-                        hidden_len=len(batch_v),
+                        hidden_len=batch_v.shape[1],
                         num_layers=args.num_layers,
                         grid_size=args.grid_size,
                         embedding_size=args.embedding_size,
                         dropout=args.dropout)
 
-                    hidden_state = np.zeros(shape=(len(batch_v), args.rnn_size))
+                    hidden_state = np.zeros(shape=(batch_v.shape[1], args.rnn_size))
 
                     stat_ngh = helper.neighborhood_stat_enc(
                         hidden_size=args.rnn_size,
@@ -300,9 +307,6 @@ def train(args):
                     checkpoint_path = os.path.join('save', 'social_model.ckpt')
                     saver.save(sess, checkpoint_path, global_step=e * dataloader.num_batches + b)
                     print("model saved to {}".format(checkpoint_path))
-
-
-
 
     # Validate
     # dataloader.reset_data_pointer(valid=True)
