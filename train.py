@@ -221,8 +221,10 @@ def train(args):
                         #         krnl_mdl.visual_path: tf.make_ndarray(vislet)}
                         # run tf session to get through the GridLSTM then continue with pyTorch
                         # krnl_mdl.cost is our relational loss (its loss related to having lower regression curve compared to the all-ones edge matrix)
-                        # logistic regression
-
+                        # logistic regression over diagonal values in jacobian (identity) matrix
+                        # the krnl_mdl.cost has eigen values where each eigen value is the derivative of each pedestrian with respect to its own trajectory and  affected by ngh * lambda
+                        # take each eigen and verify how it can be transformed to sample future trajectory
+                        # TODO: the eigen can be mean of future path distribution or can be parameter to set neighborhood boundaries?
                         pred_path, jacobian =\
                             sess.run([krnl_mdl.pred_path_band, krnl_mdl.cost],
                                      feed_dict={krnl_mdl.outputs: np.concatenate((st_embeddings,vislet), axis=0),
