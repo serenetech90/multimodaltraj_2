@@ -24,24 +24,24 @@ class neighborhood_vis_loc_encoder():
         self.hidden_size = hidden_size
         self.embedding_size = embedding_size
         self.input = tf.placeholder(dtype=tf.float64, shape=[hidden_len,hidden_len], name="inputs")
-        self.i_hidden_state = tf.placeholder(name='i_hidden_state',shape=(hidden_len, self.hidden_size), dtype=tf.float64)
+        self.i_hidden_state = tf.placeholder(name='i_hidden_state', shape=(hidden_len, self.hidden_size), dtype=tf.float64)
 
-        self.c_hidden_state = tf.placeholder(name='c_hidden_state',shape=(hidden_len, (grid_size * (grid_size/2))), dtype=tf.float64)
+        self.c_hidden_state = tf.placeholder(name='c_hidden_state', shape=(hidden_len, (grid_size * (grid_size/2))), dtype=tf.float64)
         self.num_freq_blocks = tf.placeholder(name='num_freq_blocks', dtype=tf.float32)
 
-        # self.rnn = rnn.GridLSTMCell(num_units=num_layers,
-        #                             feature_size=grid_size,
-        #                             frequency_skip=grid_size,
-        #                             use_peepholes=True,
-        #                             num_frequency_blocks=self.num_freq_blocks,
-        #                             share_time_frequency_weights=True,
-        #                             state_is_tuple=False,
-        #                             couple_input_forget_gates=True,
-        #                             reuse=tf.AUTO_REUSE)
+        self.rnn = rnn.GridLSTMCell(num_units=num_layers,
+                                    feature_size=grid_size,
+                                    frequency_skip=grid_size,
+                                    use_peepholes=True,
+                                    num_frequency_blocks=[grid_size/2],
+                                    share_time_frequency_weights=True,
+                                    state_is_tuple=False,
+                                    couple_input_forget_gates=True,
+                                    reuse=tf.AUTO_REUSE)
 
-        self.rnn = rnn_t.LSTMCell(num_units=num_layers, name='nghood_lstm', use_peepholes=True,
-                                  initializer='normal', dynamic=True,
-                                  dtype=tf.float64)
+        # self.rnn = rnn_t.LSTMCell(num_units=num_layers, name='nghood_lstm', use_peepholes=True,
+        #                           initializer='normal', dynamic=True,
+        #                           dtype=tf.float64)
 
         self.output = tf.placeholder(dtype=tf.float64, shape=[hidden_len, (grid_size * (grid_size/2))],
                                      name="output")

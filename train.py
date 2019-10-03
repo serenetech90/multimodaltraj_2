@@ -64,6 +64,10 @@ def main():
     # Size of the social grid parameter
     parser.add_argument('--grid_size', type=int, default=4,
                         help='Grid size of the social grid')
+
+    parser.add_argument('--num_freq_blocks', type=int, default=10,
+                        help='Grid size of the social grid')
+
     # Maximum number of pedestrians to be considered
     parser.add_argument('--maxNumPeds', type=int, default=20,
                         help='Maximum Number of Pedestrians')
@@ -107,6 +111,14 @@ def train(args):
             # TODO augment vislets later
             vislet = np.expand_dims(a=batch_v[0], axis=0)
 
+            with tf.variable_scope('weight_input'):
+                init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
+                weight_i = tf.Variable(name='weight_i', initial_value=init_w(shape=(num_nodes, args.num_freq_blocks)),
+                                       trainable=True, dtype=tf.float64)
+                weight_ii = tf.Variable(name='weight_ii',
+                                        initial_value=init_w(shape=(args.num_freq_blocks, args.input_size)),
+                                        trainable=True, dtype=tf.float64)
+
             # salient social interaction spot
             # GNN component
             # cat = batch_v.shape[1] - batch_v.shape[0]
@@ -115,7 +127,7 @@ def train(args):
 
             nghood_enc = helper.neighborhood_vis_loc_encoder(
                 hidden_size=args.rnn_size,
-                hidden_len=batch_v.shape[1],
+                hidden_len=args.num_freq_blocks,
                 num_layers=args.num_layers,
                 grid_size=args.grid_size,
                 embedding_size=args.embedding_size,
@@ -144,20 +156,20 @@ def train(args):
             print('session started')
             start = args.seq_length + 1
             end = int(len(batch)/(args.seq_length + 1))
+
+            inputs = tf.convert_to_tensor(batch_v, dtype=tf.float64)
+            inputs = tf.matmul(inputs, weight_i)
+            inputs = tf.matmul(weight_ii, inputs)
+
             # dim = [720, 576]
             # Train
             while e < args.num_epochs:
                 for b in range(dataloader.num_batches):
-                    with tf.variable_scope('weight_input'):
-                        init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
-                        weight_i = tf.Variable(name='weight_i', initial_value=init_w(shape=(num_nodes, 2)),
-                                                    trainable=True, dtype=tf.float64)
                     with tf.variable_scope('nghood_init'):
                         out_init = tf.zeros(dtype=tf.float64,shape=(num_nodes, (args.grid_size * (args.grid_size/2))))
                         c_hidden_init = tf.zeros(dtype=tf.float64,shape=(num_nodes,(args.grid_size * (args.grid_size/2))))
 
-
-                    tf.initialize_variables(var_list=[weight_i]).run()
+                    tf.initialize_variables(var_list=[weight_i,weight_ii]).run()
                     for i in range(start, end):
                         # check if get_node_attr gets complete sequence for all nodes
                         # num_nodes x obs_length
@@ -173,8 +185,7 @@ def train(args):
                         # if len(batch_v) != nghood_enc.input.shape[0]:
                         #     nghood_enc.update_input_size(new_size=len(batch_v))
                         # hidden_state = nghood_enc.init_hidden(len(batch_v))
-                        inputs = tf.convert_to_tensor(batch_v, dtype=tf.float64)
-                        inputs = tf.matmul(weight_i, inputs)
+
 
                         st_embeddings, hidden_state, output, c_hidden_state =\
                             sess.run([nghood_enc.input, nghood_enc.i_hidden_state,
@@ -288,6 +299,19 @@ def train(args):
 
                     vislet = np.expand_dims(a=batch_v[0], axis=0)
 
+                    with tf.variable_scope('weight_input'):
+                        init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
+                        weight_i = tf.Variable(name='weight_i',
+                                               initial_value=init_w(shape=(num_nodes, args.num_freq_blocks)),
+                                               trainable=True, dtype=tf.float64)
+                        weight_ii = tf.Variable(name='weight_ii',
+                                                initial_value=init_w(shape=(args.num_freq_blocks, args.input_size)),
+                                                trainable=True, dtype=tf.float64)
+
+                    inputs = tf.convert_to_tensor(batch_v, dtype=tf.float64)
+                    inputs = tf.matmul(inputs, weight_i)
+                    inputs = tf.matmul(weight_ii, inputs)
+
                     # salient social interaction spot
                     # GNN component
                     # cat = batch_v.shape[1] - batch_v.shape[0]
@@ -296,7 +320,7 @@ def train(args):
 
                     nghood_enc = helper.neighborhood_vis_loc_encoder(
                         hidden_size=args.rnn_size,
-                        hidden_len=batch_v.shape[1],
+                        hidden_len=args.num_freq_blocks,
                         num_layers=args.num_layers,
                         grid_size=args.grid_size,
                         embedding_size=args.embedding_size,
