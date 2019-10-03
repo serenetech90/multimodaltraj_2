@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 # from torch.utils.serialization import load_lua as llua
 import tensorflow as tf
+import tensorflow.contrib.rnn as rnn_t
 from tensorflow.contrib.rnn.python.ops import rnn_cell as rnn
 # import tensorflow.contrib.grid_rnn as grnn
 # https://github.com/tensorflow/tensorflow/blob/r1.8/tensorflow/contrib/rnn/python/ops/rnn_cell.py
@@ -23,50 +24,56 @@ class neighborhood_vis_loc_encoder():
         self.hidden_size = hidden_size
         self.embedding_size = embedding_size
         self.input = tf.placeholder(dtype=tf.float64, shape=[hidden_len,hidden_len], name="inputs")
-        self.hidden_state = tf.placeholder(name='hidden_state',shape=(hidden_len, self.hidden_size), dtype=tf.float64)
+        self.i_hidden_state = tf.placeholder(name='i_hidden_state',shape=(hidden_len, self.hidden_size), dtype=tf.float64)
 
+        self.c_hidden_state = tf.placeholder(name='c_hidden_state',shape=(hidden_len, (grid_size * (grid_size/2))), dtype=tf.float64)
+        self.num_freq_blocks = tf.placeholder(name='num_freq_blocks', dtype=tf.float32)
 
-        self.rnn = rnn.GridLSTMCell(num_units=num_layers,
-                                    feature_size=grid_size,
-                                    frequency_skip=grid_size,
-                                    use_peepholes=True,
-                                    num_frequency_blocks=[grid_size/2],
-                                    share_time_frequency_weights=True,
-                                    state_is_tuple=False,
-                                    couple_input_forget_gates=True,
-                                    reuse=tf.AUTO_REUSE)
-                                    # .add_weight(name='weight', shape=(2,hidden_size))
+        # self.rnn = rnn.GridLSTMCell(num_units=num_layers,
+        #                             feature_size=grid_size,
+        #                             frequency_skip=grid_size,
+        #                             use_peepholes=True,
+        #                             num_frequency_blocks=self.num_freq_blocks,
+        #                             share_time_frequency_weights=True,
+        #                             state_is_tuple=False,
+        #                             couple_input_forget_gates=True,
+        #                             reuse=tf.AUTO_REUSE)
+
+        self.rnn = rnn_t.LSTMCell(num_units=num_layers, name='nghood_lstm', use_peepholes=True,
+                                  initializer='normal', dynamic=True,
+                                  dtype=tf.float64)
+
+        self.output = tf.placeholder(dtype=tf.float64, shape=[hidden_len, (grid_size * (grid_size/2))],
+                                     name="output")
+        # .add_weight(name='weight', shape=(2,hidden_size))
                                     # initial_value=init_w(shape=(2,hidden_size)),
                                     # trainable=True
-                                     #regularizer= reg_w.l2(weights=init_w(shape=(2,hidden_size)))
-
+                                    #regularizer= reg_w.l2(weights=init_w(shape=(2,hidden_size)))
         # self.rnn = nn.GRU(input_size, hidden_size, num_layers,
         #                   batch_first=True, bidirectional=False, dropout=dropout)
         # self.rnn.add_weight(name='weight', shape=(2,hidden_size),
         #                     trainable=True,initializer=init_w(shape=(2,hidden_size)))
-
-        self.forward(self.input)
+        self.forward()
 
     def update_input_size(self, new_size):
         self.input = tf.placeholder(dtype=tf.float64, shape=[new_size, new_size], name="inputs")
         self.hidden_state = tf.placeholder(name='hidden_state', shape=(new_size, self.hidden_size), dtype=tf.float64)
 
-    def forward(self, input):
+    def forward(self):
         # vislet, location = *input[0], *input[1]
         # Combine both features
         # hidden = tf.convert_to_tensor(hidden, dtype=tf.float64)
         # input = tf.reshape
         # input = tf.nn.relu_layer(x=input , weights=tf)
 
-        self.input, self.hidden_state = self.rnn(inputs=input,state=self.hidden_state)
+        self.output, self.c_hidden_state = self.rnn(inputs=self.input, state=self.i_hidden_state)
         # self.input = tf.transpose(output)
         # self.hidden_state = tf.transpose(hidden_state)
-
         # transform from tf class to Pytorch tensors signature
         # return tf.transpose(output), tf.transpose(new_hidden)
 
     def init_hidden(self, size):
-       return tf.zeros(name='hidden_state',shape=(size, self.hidden_size), dtype=tf.float64)
+        return tf.zeros(name='hidden_state',shape=(size, self.hidden_size), dtype=tf.float64)
 
 class neighborhood_stat_enc():
     # TODO code for later experiment
@@ -118,10 +125,14 @@ class neighborhood_stat_enc():
                                     reuse=True)
 
         self.static_mask = tf.placeholder(name='static_mask', shape=(dim,num_nodes), dtype=tf.float64)
-        self.social_frame = tf.placeholder(name='social_frame', shape=(num_nodes,num_nodes), dtype=tf.float64)
-        self.hidden_state = tf.placeholder(name='hidden_state', shape=(num_nodes,hidden_size), dtype=tf.float64)
+        self.social_frame = tf.placeholder(name='social_frame', shape=(num_nodes,dim), dtype=tf.float64)
+        self.i_hidden_state = tf.placeholder(name='i_hidden_state', shape=(num_nodes,hidden_size), dtype=tf.float64)
 
-        self.forward(self.static_mask , self.social_frame, self.hidden_state)
+        self.c_hidden_states = tf.placeholder(name='c_hidden_states',shape=(num_nodes, (grid_size * (grid_size/2))), dtype=tf.float64)
+        self.output = tf.placeholder(dtype=tf.float64, shape=[num_nodes, (grid_size * (grid_size / 2))],
+                                     name="output")
+
+        self.forward(self.static_mask , self.social_frame, self.i_hidden_state)
         # self.rnn = nn.GRUCell(input_size, hidden_size, num_layers)
         # GRUCell is stacked GRU model but it doesnt provide Grid scheme of sharing weights along multidimensional GRU
         # llua('/home/serene/PycharmProjects/multimodaltraj/grid-lstm-master/model/GridLSTM.lua')
@@ -136,9 +147,9 @@ class neighborhood_stat_enc():
         # such that this relative distance embeddings now leads us to weight the frame neighborhoods and
         # evaluate occupancy inside each local neighborhood
 
-        input = tf.matmul(a=input, b=social_frame)# Soft-attention mechanism equipped with static grid
+        input = tf.matmul(b=input, a=social_frame)# Soft-attention mechanism equipped with static grid
         # input = tf.matmul(input, tf.ones_like(tf.transpose(input)))
-        input = tf.transpose(input)
-        output, new_hidden = self.rnn(inputs=input, state=hidden)
+        # input = tf.transpose(input)
+        self.output, self.c_hidden_states = self.rnn(inputs=input, state=hidden)
 
-        return output, new_hidden
+        # return output, new_hidden

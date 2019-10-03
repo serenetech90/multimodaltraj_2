@@ -152,6 +152,10 @@ def train(args):
                         init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
                         weight_i = tf.Variable(name='weight_i', initial_value=init_w(shape=(num_nodes, 2)),
                                                     trainable=True, dtype=tf.float64)
+                    with tf.variable_scope('nghood_init'):
+                        out_init = tf.zeros(dtype=tf.float64,shape=(num_nodes, (args.grid_size * (args.grid_size/2))))
+                        c_hidden_init = tf.zeros(dtype=tf.float64,shape=(num_nodes,(args.grid_size * (args.grid_size/2))))
+
 
                     tf.initialize_variables(var_list=[weight_i]).run()
                     for i in range(start, end):
@@ -172,9 +176,13 @@ def train(args):
                         inputs = tf.convert_to_tensor(batch_v, dtype=tf.float64)
                         inputs = tf.matmul(weight_i, inputs)
 
-                        st_embeddings , hidden_state =\
-                            sess.run([nghood_enc.input , nghood_enc.hidden_state],
-                                    feed_dict={nghood_enc.input:inputs.eval(), nghood_enc.hidden_state:hidden_state})
+                        st_embeddings, hidden_state, output, c_hidden_state =\
+                            sess.run([nghood_enc.input, nghood_enc.i_hidden_state,
+                                      nghood_enc.output, nghood_enc.c_hidden_state],
+                                    feed_dict={nghood_enc.input: inputs.eval(),
+                                               nghood_enc.i_hidden_state:hidden_state,
+                                               nghood_enc.output:out_init.eval(),
+                                               nghood_enc.c_hidden_state: c_hidden_init.eval()})
 
                         # st_embeddings, hidden_state = nghood_enc.forward(batch_v, hidden_state)
                         # input_size=args.input_size,
@@ -189,11 +197,17 @@ def train(args):
                         #                                       grid_size= args.grid_size)
                         # tf.initialize_all_variables().run()
                         # st_embeddings = nghood_enc.input
+                        # st_embeddings = nghood_enc.output.eval()
+                        # hidden_state = nghood_enc.c_hidden_state.eval()
+
                         combined_ngh, hidden_state = \
-                            sess.run([stat_ngh.static_mask, stat_ngh.hidden_state],
-                            feed_dict={stat_ngh.static_mask: static_mask_nd,
-                                       stat_ngh.social_frame: st_embeddings,
-                                       stat_ngh.hidden_state: hidden_state})
+                            sess.run([stat_ngh.static_mask, stat_ngh.i_hidden_state],
+                                     feed_dict={stat_ngh.static_mask: static_mask_nd,
+                                                stat_ngh.social_frame: output,
+                                                stat_ngh.i_hidden_state: hidden_state,
+                                                stat_ngh.output: out_init.eval(),
+                                                stat_ngh.c_hidden_states: c_hidden_init.eval()})
+
                         # to become weighted mask of densest regions (interactive regions / hot-spots )
                         # combined_ngh [8x4] and st_embeddings [8x2] , next use generate vislets features embeddings
                         # reach here, TODO: check if states and frequency blocks output is properly done.
@@ -272,13 +286,14 @@ def train(args):
                     batch_v = np.transpose(batch_v)
                     num_nodes = batch_v.shape[1]
 
-                    vislet = np.expand_dims(a=batch_v[batch_v.shape[1] - 1], axis=0)
+                    vislet = np.expand_dims(a=batch_v[0], axis=0)
 
                     # salient social interaction spot
                     # GNN component
                     # cat = batch_v.shape[1] - batch_v.shape[0]
                     # batch_v = tf.zeros(shape=(batch_v.shape[1], batch_v.shape[1])) + tf.convert_to_tensor(batch_v, dtype=tf.float64)
                     # batch_v = np.concatenate((batch_v, np.zeros(shape=(cat, num_nodes))), axis=0)
+
                     nghood_enc = helper.neighborhood_vis_loc_encoder(
                         hidden_size=args.rnn_size,
                         hidden_len=batch_v.shape[1],
