@@ -109,7 +109,8 @@ def train(args):
             batch_v = np.transpose(batch_v)
             num_nodes = batch_v.shape[1]
             # TODO augment vislets later
-            vislet = np.expand_dims(a=batch_v[0], axis=0)
+
+            vislet = np.expand_dims(a=tf.zeros(args.num_freq_blocks), axis=0)
 
             with tf.variable_scope('weight_input'):
                 init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
@@ -160,14 +161,15 @@ def train(args):
             inputs = tf.convert_to_tensor(batch_v, dtype=tf.float64)
             inputs = tf.matmul(inputs, weight_i)
             inputs = tf.matmul(weight_ii, inputs)
+            hidden_state = np.zeros(shape=(args.num_freq_blocks, args.rnn_size))
 
             # dim = [720, 576]
             # Train
             while e < args.num_epochs:
                 for b in range(dataloader.num_batches):
                     with tf.variable_scope('nghood_init'):
-                        out_init = tf.zeros(dtype=tf.float64,shape=(num_nodes, (args.grid_size * (args.grid_size/2))))
-                        c_hidden_init = tf.zeros(dtype=tf.float64,shape=(num_nodes,(args.grid_size * (args.grid_size/2))))
+                        out_init = tf.zeros(dtype=tf.float64,shape=(args.num_freq_blocks, (args.grid_size * (args.grid_size/2))))
+                        c_hidden_init = tf.zeros(dtype=tf.float64,shape=(args.num_freq_blocks,(args.grid_size * (args.grid_size/2))))
 
                     tf.initialize_variables(var_list=[weight_i,weight_ii]).run()
                     for i in range(start, end):
@@ -297,7 +299,7 @@ def train(args):
                     batch_v = np.transpose(batch_v)
                     num_nodes = batch_v.shape[1]
 
-                    vislet = np.expand_dims(a=batch_v[0], axis=0)
+                    vislet = np.expand_dims(a=tf.zeros(args.num_freq_blocks), axis=0)
 
                     with tf.variable_scope('weight_input'):
                         init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
@@ -326,17 +328,15 @@ def train(args):
                         embedding_size=args.embedding_size,
                         dropout=args.dropout)
 
-                    hidden_state = np.zeros(shape=(batch_v.shape[1], args.rnn_size))
-
                     stat_ngh = helper.neighborhood_stat_enc(
                         hidden_size=args.rnn_size,
                         num_layers=args.num_layers,
                         grid_size=args.grid_size,
                         dim=dim,
-                        num_nodes=num_nodes,
+                        num_nodes=args.num_freq_blocks,
                         dropout=args.dropout)
 
-                    stat_mask = tf.zeros(shape=(dim, num_nodes), dtype=tf.float64)
+                    stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
                     stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
                     static_mask_nd = stat_mask.eval()
 
