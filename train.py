@@ -108,9 +108,10 @@ def train(args):
             batch_v = list(graph_t.get_node_attr(param='node_pos_list').values())
             batch_v = np.transpose(batch_v)
             num_nodes = batch_v.shape[1]
+
             # TODO augment vislets later
 
-            vislet = np.expand_dims(a=tf.zeros(args.num_freq_blocks), axis=0)
+            vislet = np.zeros(shape=(1,args.num_freq_blocks))
 
             with tf.variable_scope('weight_input'):
                 init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
@@ -120,6 +121,8 @@ def train(args):
                                         initial_value=init_w(shape=(args.num_freq_blocks, args.input_size)),
                                         trainable=True, dtype=tf.float64)
 
+            vislet = tf.expand_dims(batch_v[0], axis=0)
+            vislet_emb = tf.matmul(vislet, weight_i)
             # salient social interaction spot
             # GNN component
             # cat = batch_v.shape[1] - batch_v.shape[0]
@@ -149,7 +152,7 @@ def train(args):
             static_mask_nd = stat_mask.eval()
 
             krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input , out_size=batch_v.shape[1],
-                                        obs_len=args.seq_length,
+                                        num_nodes=num_nodes, obs_len=args.seq_length,
                                         lambda_reg=args.lambda_param)
 
             # sess.run(tf.global_variables_initializer())
@@ -187,7 +190,6 @@ def train(args):
                         # if len(batch_v) != nghood_enc.input.shape[0]:
                         #     nghood_enc.update_input_size(new_size=len(batch_v))
                         # hidden_state = nghood_enc.init_hidden(len(batch_v))
-
 
                         st_embeddings, hidden_state, output, c_hidden_state =\
                             sess.run([nghood_enc.input, nghood_enc.i_hidden_state,
@@ -252,12 +254,15 @@ def train(args):
                         # the krnl_mdl.cost has eigen values where each eigen value is the derivative of each pedestrian with respect to its own trajectory and  affected by ngh * lambda
                         # take each eigen and verify how it can be transformed to sample future trajectory
                         # TODO: the eigen can be mean of future path distribution or can be parameter to set neighborhood boundaries?
+                        # vislet = tf.expand_dims(batch_v[0], axis=0)
+                        # vislet_emb = tf.matmul(vislet, weight_i)
+
                         pred_path, jacobian =\
                             sess.run([krnl_mdl.pred_path_band, krnl_mdl.cost],
-                                     feed_dict={krnl_mdl.outputs: np.concatenate((st_embeddings,vislet), axis=0),
+                                     feed_dict={krnl_mdl.outputs: np.concatenate((st_embeddings,vislet_emb.eval()), axis=0),
                                      krnl_mdl.ngh: combined_ngh,
                                      krnl_mdl.pred_path_band: np.zeros(shape=(2, 8, len(st_embeddings))),
-                                     krnl_mdl.visual_path: vislet})
+                                     krnl_mdl.visual_path: vislet.eval()})
 
                         # pred_path, jacobian = sess.run(fetches=krnl_mdl)
                         # pred_path, jacobian = sess.run(krnl_mdl.forward,
@@ -299,8 +304,6 @@ def train(args):
                     batch_v = np.transpose(batch_v)
                     num_nodes = batch_v.shape[1]
 
-                    vislet = np.expand_dims(a=tf.zeros(args.num_freq_blocks), axis=0)
-
                     with tf.variable_scope('weight_input'):
                         init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
                         weight_i = tf.Variable(name='weight_i',
@@ -313,6 +316,9 @@ def train(args):
                     inputs = tf.convert_to_tensor(batch_v, dtype=tf.float64)
                     inputs = tf.matmul(inputs, weight_i)
                     inputs = tf.matmul(weight_ii, inputs)
+
+                    vislet = tf.expand_dims(batch_v[0], axis=0)
+                    vislet_emb = tf.matmul(vislet, weight_i)
 
                     # salient social interaction spot
                     # GNN component
@@ -341,7 +347,7 @@ def train(args):
                     static_mask_nd = stat_mask.eval()
 
                     krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
-                                                obs_len=args.seq_length,
+                                                num_nodes=num_nodes, obs_len=args.seq_length,
                                                 lambda_reg=args.lambda_param)
 
                 if (e * dataloader.num_batches + b) % args.save_every == 0 and ((e * dataloader.num_batches + b) > 0):

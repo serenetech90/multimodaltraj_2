@@ -9,10 +9,10 @@ from torch.nn import functional as F
 import torch.cuda
 
 class g2k_lstm_mcr():
-    def __init__(self, in_features, out_size, obs_len, lambda_reg):
+    def __init__(self, in_features, out_size, obs_len, num_nodes, lambda_reg):
         # super(g2k_lstm_mcr).__init__()
         # self.relu = tf.nn.relu_layer()
-        self.out_size = out_size
+        self.out_size = num_nodes
         self.lambda_reg = tf.Variable(lambda_reg, dtype=tf.float64)
 
         self.outputs = tf.placeholder(dtype=tf.float64,
@@ -21,9 +21,9 @@ class g2k_lstm_mcr():
         self.ngh = tf.placeholder(dtype=tf.float64,
                                   shape=[8, int(in_features.shape[0])], name="ngh")
         self.visual_path = tf.placeholder(dtype=tf.float64,
-                                          shape=[1, out_size], name="visual_path")
+                                          shape=[1, in_features.shape[0]], name="visual_path")
         self.pred_path_band = tf.placeholder(dtype=tf.float64,
-                                             shape=[2,8,out_size], name="pred_path_band")
+                                             shape=[2,8,num_nodes], name="pred_path_band")
 
         self.init_w = tf.initializers.random_normal(mean=0, stddev=1,seed=0,dtype=tf.float64)
 
@@ -43,6 +43,11 @@ class g2k_lstm_mcr():
             self.init_w(shape=(16, obs_len)),
             # shape=tf.shape(1,in_features.shape[1].value),
             dtype=tf.float64)
+
+        self.weight_o = tf.Variable(name='weight_o', initial_value= \
+            self.init_w(shape=(int(in_features.shape[0]), num_nodes)),
+                                    # shape=tf.shape(1,in_features.shape[1].value),
+                                    dtype=tf.float64)
 
         self.forward()
         # self.pred_path, self.cost = self.forward()
@@ -86,8 +91,9 @@ class g2k_lstm_mcr():
         # self.cost = tf.matmul(self.ngh, self.outputs)
 
         temp_path = tf.Variable(tf.matmul(self.weight_c, self.cost))
+        temp_path = tf.Variable(tf.matmul(temp_path, self.weight_o))
 
-        self.pred_path_band = tf.reshape(temp_path, (2, 8, int(self.outputs.shape[1])))
+        self.pred_path_band = tf.reshape(temp_path, (2, 8, self.out_size))
 
         # pred_path_band = tf.matmul(self.weight_k, tf.squeeze(self.cost)) + self.bias_k
         # pred_path_band = tf.nn.xw_plus_b(x=tf.transpose(d_outputs), weights=self.weight_k, biases=self.bias_k)
