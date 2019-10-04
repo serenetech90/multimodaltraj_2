@@ -261,9 +261,9 @@ def train(args):
                             sess.run([krnl_mdl.pred_path_band, krnl_mdl.cost],
                                      feed_dict={krnl_mdl.outputs: np.concatenate((st_embeddings,vislet_emb.eval()), axis=0),
                                      krnl_mdl.ngh: combined_ngh,
-                                     krnl_mdl.pred_path_band: np.zeros(shape=(2, 8, len(st_embeddings))),
-                                     krnl_mdl.visual_path: vislet.eval()})
+                                     krnl_mdl.pred_path_band: np.zeros(shape=(2, 8, num_nodes))})
 
+                        # , krnl_mdl.visual_path: vislet.eval()
                         # pred_path, jacobian = sess.run(fetches=krnl_mdl)
                         # pred_path, jacobian = sess.run(krnl_mdl.forward,
                         #                         feed_dict={x:st_embeddings,

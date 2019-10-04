@@ -66,7 +66,6 @@ class g2k_lstm_mcr():
         # embedded_spatial_vislet = tf.nn.relu(tf.nn.xw_plus_b(self.visual_path, self.weight_v, self.bias_v))
         embedded_spatial_vislet = tf.Variable(tf.matmul(self.weight_v, self.outputs) + self.bias_v)
         ngh_temp = embedded_spatial_vislet * self.ngh + (self.lambda_reg * self.ngh)
-
         # ngh = tf.Variable(initial_value=tf.multiply(embedded_spatial_vislet, ngh),
         #                   trainable=True,
         #                   name='ngh')
@@ -81,7 +80,6 @@ class g2k_lstm_mcr():
         # Jacobian is the following m × n matrix
         # compute neighborhood as a function of the social and spatial features
         # determined by social embedded features.
-
         # ys_temp = tf.zeros_like(self.ngh)
 
         self.cost = tf.gradients(ys=ngh_temp, xs=embedded_spatial_vislet, unconnected_gradients='zero')
