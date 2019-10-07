@@ -55,10 +55,15 @@ class online_graph():
                         # if self.node:
                         node = Node(node_id, node_pos_list)
                         # if framenum > 8 and framenum % 8 == 1:
-                        if len(future_traj[pedID][framenum:framenum+8]) < 8:
-                            node.setTargets(future_traj[pedID])
-                        else:
-                            node.setTargets(seq=future_traj[pedID][framenum:framenum+8])
+                        try:
+                            if len(future_traj[pedID]) < framenum:
+                                node.setTargets(seq=future_traj[pedID][0:8])
+                            elif len(future_traj[pedID][framenum:framenum+8]) < 8:
+                                node.setTargets(future_traj[pedID])
+                            else:
+                                node.setTargets(seq=future_traj[pedID][framenum:framenum+8])
+                        except KeyError:
+                            continue
                         self.onlineGraph.setNodes(framenum, node)
 
         self.onlineGraph.dist_mat = torch.zeros(len(self.nodes), len(self.nodes))

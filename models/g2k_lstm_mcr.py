@@ -35,10 +35,12 @@ class g2k_lstm_mcr():
             self.init_w(shape=(8,int(in_features.shape[0])+1)),
             # shape=tf.shape(1,in_features.shape[1].value),
             dtype=tf.float64)
+
         self.bias_v = tf.Variable(name='bias_v', initial_value= \
             self.init_w(shape=(int(in_features.shape[0]),)),
             # shape=tf.shape(1,in_features.shape[1].value),
             dtype=tf.float64)
+
         self.weight_c = tf.Variable(name='weight_c', initial_value= \
             self.init_w(shape=(16, obs_len)),
             # shape=tf.shape(1,in_features.shape[1].value),

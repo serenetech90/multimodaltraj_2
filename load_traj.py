@@ -27,8 +27,8 @@ class DataLoader():
             parent_dir + '/eth/univ/',
             parent_dir + '/ucy/zara/zara02/',
             parent_dir + '/ucy/zara/zara01/',
-            parent_dir + '/ucy/univ/'
-            # parent_dir + '/annotation_tc.txt'
+            parent_dir + '/ucy/univ/',
+            parent_dir + '/annotation_tc.txt'
             ]
         # parent_dir + '/stanford/bookstore/',
         # parent_dir + '/stanford/hyang/',

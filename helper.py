@@ -24,9 +24,10 @@ class neighborhood_vis_loc_encoder():
         self.hidden_size = hidden_size
         self.embedding_size = embedding_size
         self.input = tf.placeholder(dtype=tf.float64, shape=[hidden_len,hidden_len], name="inputs")
-        self.i_hidden_state = tf.placeholder(name='i_hidden_state', shape=(hidden_len, self.hidden_size), dtype=tf.float64)
+        self.state_f00_b00_c = tf.placeholder(name='state_f00_b00_c', shape=(hidden_len, self.hidden_size), dtype=tf.float64)
+        self.c_hidden_state = tf.placeholder(name='c_hidden_state', shape=(hidden_len, self.hidden_size), dtype=tf.float64)
 
-        self.c_hidden_state = tf.placeholder(name='c_hidden_state', shape=(hidden_len, (grid_size * (grid_size/2))), dtype=tf.float64)
+        self.state_f00_b00_m = tf.placeholder(name='state_f00_b00_m', shape=(hidden_len, (grid_size * (grid_size/2))), dtype=tf.float64)
         self.num_freq_blocks = tf.placeholder(name='num_freq_blocks', dtype=tf.float32)
 
         self.rnn = rnn.GridLSTMCell(num_units=num_layers,
@@ -66,7 +67,7 @@ class neighborhood_vis_loc_encoder():
         # input = tf.reshape
         # input = tf.nn.relu_layer(x=input , weights=tf)
 
-        self.output, self.c_hidden_state = self.rnn(inputs=self.input, state=self.i_hidden_state)
+        self.output, self.c_hidden_state = self.rnn(inputs=self.input, state=self.state_f00_b00_c)
         # self.input = tf.transpose(output)
         # self.hidden_state = tf.transpose(hidden_state)
         # transform from tf class to Pytorch tensors signature
@@ -126,13 +127,17 @@ class neighborhood_stat_enc():
 
         self.static_mask = tf.placeholder(name='static_mask', shape=(dim,num_nodes), dtype=tf.float64)
         self.social_frame = tf.placeholder(name='social_frame', shape=(num_nodes,dim), dtype=tf.float64)
-        self.i_hidden_state = tf.placeholder(name='i_hidden_state', shape=(num_nodes,hidden_size), dtype=tf.float64)
+        self.state_f00_b00_c = tf.placeholder(name='state_f00_b00_c', shape=(num_nodes,hidden_size), dtype=tf.float64)
+        self.c_hidden_states = tf.placeholder(name='c_hidden_states',
+                                              shape=(num_nodes, (grid_size * (grid_size/2))), dtype=tf.float64)
 
-        self.c_hidden_states = tf.placeholder(name='c_hidden_states',shape=(num_nodes, (grid_size * (grid_size/2))), dtype=tf.float64)
+        self.state_f00_b00_m = tf.placeholder(name='state_f00_b00_m',
+                                              shape=(num_nodes, (grid_size * (grid_size/2))), dtype=tf.float64)
+
         self.output = tf.placeholder(dtype=tf.float64, shape=[num_nodes, (grid_size * (grid_size / 2))],
                                      name="output")
 
-        self.forward(self.static_mask , self.social_frame, self.i_hidden_state)
+        self.forward(self.static_mask , self.social_frame, self.state_f00_b00_c)
         # self.rnn = nn.GRUCell(input_size, hidden_size, num_layers)
         # GRUCell is stacked GRU model but it doesnt provide Grid scheme of sharing weights along multidimensional GRU
         # llua('/home/serene/PycharmProjects/multimodaltraj/grid-lstm-master/model/GridLSTM.lua')
