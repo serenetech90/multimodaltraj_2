@@ -109,10 +109,17 @@ class neighborhood_stat_enc():
     # try grid lstm cell in place of cnn to encode spatial features
     # to encode relative spatial interactions human-space combine both neighborhood networks,
     # the static neighborhood network encodes the poi in the scene first
-    def __init__(self, hidden_size, num_layers,grid_size, dim, num_nodes,dropout=0):
+    def __init__(self, hidden_size, num_layers,grid_size, dim):
         # super(neighborhood_stat_enc, self).__init__()
 
         self.hidden_size = hidden_size
+
+        self.input = tf.placeholder(name='input', shape=(dim, dim),
+                                     dtype=tf.float64)
+
+        self.hidden_state = tf.placeholder(name='hidden_state', shape=(dim, self.hidden_size),
+                                    dtype=tf.float64)
+
         # in gridLSTM frequency blocks are the units of lstm stacking vertically
         # while time LSTM spans horizontally
         self.rnn = rnn.GridLSTMCell(num_units=num_layers,
@@ -125,24 +132,14 @@ class neighborhood_stat_enc():
                                     couple_input_forget_gates=True,
                                     reuse=True)
 
-        self.static_mask = tf.placeholder(name='static_mask', shape=(dim,num_nodes), dtype=tf.float64)
-        self.social_frame = tf.placeholder(name='social_frame', shape=(num_nodes,dim), dtype=tf.float64)
-        self.state_f00_b00_c = tf.placeholder(name='state_f00_b00_c', shape=(num_nodes,hidden_size), dtype=tf.float64)
-        self.c_hidden_states = tf.placeholder(name='c_hidden_states',
-                                              shape=(num_nodes, (grid_size * (grid_size/2))), dtype=tf.float64)
+        self.output, self.c_hidden_states = self.rnn(self.input, self.hidden_state)
 
-        self.state_f00_b00_m = tf.placeholder(name='state_f00_b00_m',
-                                              shape=(num_nodes, (grid_size * (grid_size/2))), dtype=tf.float64)
-
-        self.output = tf.placeholder(dtype=tf.float64, shape=[num_nodes, (grid_size * (grid_size / 2))],
-                                     name="output")
-
-        self.forward(self.static_mask , self.social_frame, self.state_f00_b00_c)
+        # self.forward(static_mask , social_frame, hidden_state)
         # self.rnn = nn.GRUCell(input_size, hidden_size, num_layers)
         # GRUCell is stacked GRU model but it doesnt provide Grid scheme of sharing weights along multidimensional GRU
         # llua('/home/serene/PycharmProjects/multimodaltraj/grid-lstm-master/model/GridLSTM.lua')
 
-    def forward(self, input, social_frame, hidden):
+    # def forward(self, input, hidden):
         # map locations []
         # use social frame in filling occupancy state of the static mask.
         # opposed to occupancy map in Social LSTM (2016) which used binary occupancy descriptors
@@ -151,10 +148,8 @@ class neighborhood_stat_enc():
         # between two corresponding points in Euclidean geometry
         # such that this relative distance embeddings now leads us to weight the frame neighborhoods and
         # evaluate occupancy inside each local neighborhood
-
-        input = tf.matmul(b=input, a=social_frame)# Soft-attention mechanism equipped with static grid
         # input = tf.matmul(input, tf.ones_like(tf.transpose(input)))
         # input = tf.transpose(input)
-        self.output, self.c_hidden_states = self.rnn(inputs=input, state=hidden)
+
 
         # return output, new_hidden

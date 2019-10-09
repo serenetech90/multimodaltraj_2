@@ -72,6 +72,7 @@ class DataLoader():
         files = self.used_data_dirs[start] + "*.csv"  # '.txt'
         data_files = sorted(glob.glob(files))
 
+
         if sel is None:
             if len(data_files) > 1:
                 print([x for x in range(len(data_files))])
@@ -116,6 +117,7 @@ class DataLoader():
         # self.data = self.raw_data[:,2:4]
         self.frameList = self.raw_data[0,:]
         self.pedsPerFrameList = self.raw_data[0:4,:]
+        self.vislet = self.raw_data[4:6,:]
         self.seed = self.frameList[0]
         self.frame_pointer = self.seed
 
@@ -127,6 +129,7 @@ class DataLoader():
         x_batch = {}
         # Iteration index
         b = -1
+        pc = 1
         max_idx = max(self.frameList)
         # unique_frames = np.unique(self.frameList)
 
@@ -145,15 +148,22 @@ class DataLoader():
             if c <= max_log:
                 # All the data in this sequence
                 # try:
-                for idx in range(int(self.frame_pointer), int(self.frame_pointer+self.obs_len+1)):
+                rang = range(int(self.frame_pointer) , int(self.frame_pointer+(self.batch_size*self.obs_len)), self.obs_len)
+                traj_batch = [{idx:self.trajectories[idx]} for idx in rang]
+                iter_traj = iter(traj_batch)
+                for idx in traj_batch:#range(int(self.frame_pointer), int(self.frame_pointer+self.obs_len+1)):
+                    (idx , _), = idx.items()
                     source_frame = self.trajectories[idx]
                     # Number of unique peds in this sequence of frames
                     if len(source_frame):
                         x_batch[idx] = source_frame
-                        if idx % self.obs_len == 0:
-                            idx_c = idx
+                        if pc % self.obs_len == 0:
+                            try:
+                                (idx_c,_), = next(iter_traj).items()
+                            except StopIteration:
+                                break
                             for i in range(int(self.pred_len)):
-                                idx_c += 1
+                                # idx_c = next(idx_c)
                                 for j in range(len(self.trajectories[idx_c])):
                                     # if self.trajectories[idx_c] not in targets:
                                     (id, pos), = self.trajectories[idx_c][j].items()
@@ -163,7 +173,12 @@ class DataLoader():
                                         targets.update({int(id): [pos]})
                                     else:
                                         targets[int(id)].append(pos)
-                    # idx += 1
+                    pc += 1
+                    try:
+                        next(iter_traj)
+                    except StopIteration:
+                        break
+                    # iter_traj = iter(self.trajectories[tmp])
                 self.frame_pointer += self.seq_length
             else:
                 self.tick_frame_pointer(valid=False)

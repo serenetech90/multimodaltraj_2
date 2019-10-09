@@ -50,6 +50,7 @@ class online_graph():
 
                 for item in frame:
                         (pedID, pos), = item.items()
+                        pedID = int(pedID)
                         node_id = pedID
                         node_pos_list = pos
                         # if self.node:
