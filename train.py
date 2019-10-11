@@ -88,7 +88,7 @@ def train(args):
     with tf.Session(graph=tf_graph) as sess:
         with sess.as_default():
             dataloader = load.DataLoader(args=args, datasets=[0, 1, 2, 3, 4, 5], start=2, sel=0)
-            for d in range(2,4):
+            for d in range(2,5):
                 target_traj = []
                 true_path = []
                 # Train the model
@@ -104,7 +104,7 @@ def train(args):
                 # TODO implement k-fold cross validation + check why pred_path is all zeros (bug in GridLSTMCell)
                 # tf.disable_eager_execution()
                 graph = nx_g.online_graph(args)
-
+                print(dataloader.sel_file)
                 batch, target_traj, _ = dataloader.next_step(targets=target_traj)
                 # true_path.append(batch[args.seq_length + 1])
                 # correct batch len
@@ -175,14 +175,13 @@ def train(args):
                 # dim = [720, 576]
                 # Train
                 while e < args.num_epochs:
-                    for b in range(3): #range(dataloader.num_batches):
+                    for b in range(dataloader.num_batches):
                         print('Batch {0} took '.format(b))
                         start_t = time.time()
                         with tf.variable_scope('nghood_init'):
                             out_init = tf.zeros(dtype=tf.float64,shape=(args.num_freq_blocks, (args.grid_size * (args.grid_size/2))))
                             c_hidden_init = tf.zeros(dtype=tf.float64,shape=(args.num_freq_blocks,(args.grid_size * (args.grid_size/2))))
                         tf.initialize_variables(var_list=[weight_i, weight_ii]).run()
-
 
                         for frame in batch:
                             # check if get_node_attr gets complete sequence for all nodes
@@ -376,176 +375,176 @@ def train(args):
                         print("model saved to {}".format(checkpoint_path))
 
 
-                # *************************************************************** VALIDATION *************************************
+                #*************************************************************** VALIDATION *************************************
 
-                # Validate
-                # dataloader.reset_data_pointer(valid=True)
-                loss_epoch = 0
-                dataloader.valid_frame_pointer = frame + (frame * e)
-                dataloader.valid_num_batches = int((dataloader.valid_frame_pointer / dataloader.seq_length) / dataloader.batch_size)
-                for vb in range(dataloader.valid_num_batches):
-                    # Get batch data
-                    # x, _, d = dataloader.load_trajectories(data_file='')  ## stateless lstm without shuffling
-                    rang = range(frame, int(frame + (dataloader.batch_size * args.seq_length)), args.seq_length)
-                    val_traj = [{idx:traj[idx]} for idx in rang]
-                    # Loss for this batch
-                    loss_batch = 0
-                    # for batch in traj:
-                    print('Validation Batch {0} took '.format(vb))
-                    start_t = time.time()
+            # Validate
+            # dataloader.reset_data_pointer(valid=True)
+            loss_epoch = 0
+            dataloader.valid_frame_pointer = frame + (frame * e)
+            dataloader.valid_num_batches = int((dataloader.valid_frame_pointer / dataloader.seq_length) / dataloader.batch_size)
+            for vb in range(dataloader.valid_num_batches):
+                # Get batch data
+                # x, _, d = dataloader.load_trajectories(data_file='')  ## stateless lstm without shuffling
+                rang = range(frame, int(frame + (dataloader.batch_size * args.seq_length)), args.seq_length)
+                val_traj = [{idx:traj[idx]} for idx in rang]
+                # Loss for this batch
+                loss_batch = 0
+                # for batch in traj:
+                print('Validation Batch {0} took '.format(vb))
+                start_t = time.time()
 
-                    with tf.variable_scope('weight_input'):
-                        init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
-                        weight_i = tf.Variable(name='weight_i',
-                                               initial_value=init_w(shape=(num_nodes, args.num_freq_blocks)),
-                                               trainable=True, dtype=tf.float64)
-                        weight_ii = tf.Variable(name='weight_ii',
-                                                initial_value=init_w(shape=(args.num_freq_blocks, args.input_size)),
-                                                trainable=True, dtype=tf.float64)
+                with tf.variable_scope('weight_input'):
+                    init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
+                    weight_i = tf.Variable(name='weight_i',
+                                           initial_value=init_w(shape=(num_nodes, args.num_freq_blocks)),
+                                           trainable=True, dtype=tf.float64)
+                    weight_ii = tf.Variable(name='weight_ii',
+                                            initial_value=init_w(shape=(args.num_freq_blocks, args.input_size)),
+                                            trainable=True, dtype=tf.float64)
 
-                    with tf.variable_scope('nghood_init'):
-                        out_init = tf.zeros(dtype=tf.float64,
-                                            shape=(args.num_freq_blocks, (args.grid_size * (args.grid_size / 2))))
-                        c_hidden_init = tf.zeros(dtype=tf.float64, shape=(
-                        args.num_freq_blocks, (args.grid_size * (args.grid_size / 2))))
+                with tf.variable_scope('nghood_init'):
+                    out_init = tf.zeros(dtype=tf.float64,
+                                        shape=(args.num_freq_blocks, (args.grid_size * (args.grid_size / 2))))
+                    c_hidden_init = tf.zeros(dtype=tf.float64, shape=(
+                    args.num_freq_blocks, (args.grid_size * (args.grid_size / 2))))
 
-                    tf.initialize_variables(var_list=[weight_i, weight_ii]).run()
+                tf.initialize_variables(var_list=[weight_i, weight_ii]).run()
 
-                    for frame_iter in iter(val_traj):
-                        # check if get_node_attr gets complete sequence for all nodes
-                        # num_nodes x obs_length
-                        (frame_iter, _), = frame_iter.items()
-                        try:
-                            true_path.append(batch[frame_iter])
-                        except KeyError:
-                            if frame == max(batch.keys()):
-                                break
-                            if frame_iter + args.seq_length + 1 > max(batch.keys()):
-                                frame_iter = max(batch.keys())
-                            else:
-                                frame_iter += args.seq_length + 1
-                            continue
+                for frame_iter in iter(val_traj):
+                    # check if get_node_attr gets complete sequence for all nodes
+                    # num_nodes x obs_length
+                    (frame_iter, _), = frame_iter.items()
+                    try:
+                        true_path.append(batch[frame_iter])
+                    except KeyError:
+                        if frame == max(batch.keys()):
+                            break
+                        if frame_iter + args.seq_length + 1 > max(batch.keys()):
+                            frame_iter = max(batch.keys())
+                        else:
+                            frame_iter += args.seq_length + 1
+                        continue
 
-                        with tf.variable_scope('ngh_stat'):
-                            static_mask = tf.placeholder(name='static_mask',  # shape=(dim, static_frame_w),
+                    with tf.variable_scope('ngh_stat'):
+                        static_mask = tf.placeholder(name='static_mask',  # shape=(dim, static_frame_w),
+                                                     dtype=tf.float64)
+
+                        social_frame = tf.placeholder(name='social_frame',  # shape=(static_frame_w,dim),
+                                                      dtype=tf.float64)
+                        state_f00_b00_c = tf.placeholder(name='state_f00_b00_c',  # shape=(dim,hidden_size),
+                                                         dtype=tf.float64)
+                        c_hidden_states = tf.placeholder(name='c_hidden_states',
+                                                         # shape=(dim, (grid_size * (grid_size/2))),
                                                          dtype=tf.float64)
 
-                            social_frame = tf.placeholder(name='social_frame',  # shape=(static_frame_w,dim),
-                                                          dtype=tf.float64)
-                            state_f00_b00_c = tf.placeholder(name='state_f00_b00_c',  # shape=(dim,hidden_size),
-                                                             dtype=tf.float64)
-                            c_hidden_states = tf.placeholder(name='c_hidden_states',
-                                                             # shape=(dim, (grid_size * (grid_size/2))),
-                                                             dtype=tf.float64)
+                        output = tf.placeholder(dtype=tf.float64,
+                                                # shape=[num_nodes, (grid_size * (grid_size / 2))],
+                                                name="output")
 
-                            output = tf.placeholder(dtype=tf.float64,
-                                                    # shape=[num_nodes, (grid_size * (grid_size / 2))],
-                                                    name="output")
+                    st_embeddings, hidden_state, ng_output, c_hidden_state = \
+                        sess.run([nghood_enc.input, nghood_enc.state_f00_b00_c,
+                                  nghood_enc.output, nghood_enc.c_hidden_state],
+                                 feed_dict={nghood_enc.input: inputs.eval(),
+                                            nghood_enc.state_f00_b00_c: hidden_state,
+                                            nghood_enc.output: out_init.eval(),
+                                            nghood_enc.c_hidden_state: c_hidden_init.eval()})
 
-                        st_embeddings, hidden_state, ng_output, c_hidden_state = \
-                            sess.run([nghood_enc.input, nghood_enc.state_f00_b00_c,
-                                      nghood_enc.output, nghood_enc.c_hidden_state],
-                                     feed_dict={nghood_enc.input: inputs.eval(),
-                                                nghood_enc.state_f00_b00_c: hidden_state,
-                                                nghood_enc.output: out_init.eval(),
-                                                nghood_enc.c_hidden_state: c_hidden_init.eval()})
+                    static_mask, social_frame = sess.run([static_mask, output],
+                                                         feed_dict={static_mask: static_mask_nd,
+                                                                    social_frame: ng_output,
+                                                                    state_f00_b00_c: hidden_state,
+                                                                    output: out_init.eval(),
+                                                                    c_hidden_states: c_hidden_init.eval()
+                                                                    })
 
-                        static_mask, social_frame = sess.run([static_mask, output],
-                                                             feed_dict={static_mask: static_mask_nd,
-                                                                        social_frame: ng_output,
-                                                                        state_f00_b00_c: hidden_state,
-                                                                        output: out_init.eval(),
-                                                                        c_hidden_states: c_hidden_init.eval()
-                                                                        })
+                    input = tf.matmul(b=static_mask,
+                                      a=social_frame).eval()  # Soft-attention mechanism equipped with static grid
+                    combined_ngh, hidden_state = sess.run([stat_ngh.input, stat_ngh.hidden_state],
+                                                          feed_dict={stat_ngh.input: input,
+                                                                     stat_ngh.hidden_state: hidden_state})
+                    pred_path, jacobian = \
+                        sess.run([krnl_mdl.pred_path_band, krnl_mdl.cost],
+                                 feed_dict={
+                                     krnl_mdl.outputs: np.concatenate((st_embeddings, vislet_emb.eval()),
+                                                                      axis=0),
+                                     krnl_mdl.ngh: args.lambda_param * combined_ngh,
+                                     # krnl_mdl.lambda_reg: args.lambda_reg,
+                                     krnl_mdl.pred_path_band: np.zeros(shape=(2, 8, num_nodes))})
 
-                        input = tf.matmul(b=static_mask,
-                                          a=social_frame).eval()  # Soft-attention mechanism equipped with static grid
-                        combined_ngh, hidden_state = sess.run([stat_ngh.input, stat_ngh.hidden_state],
-                                                              feed_dict={stat_ngh.input: input,
-                                                                         stat_ngh.hidden_state: hidden_state})
-                        pred_path, jacobian = \
-                            sess.run([krnl_mdl.pred_path_band, krnl_mdl.cost],
-                                     feed_dict={
-                                         krnl_mdl.outputs: np.concatenate((st_embeddings, vislet_emb.eval()),
-                                                                          axis=0),
-                                         krnl_mdl.ngh: args.lambda_param * combined_ngh,
-                                         # krnl_mdl.lambda_reg: args.lambda_reg,
-                                         krnl_mdl.pred_path_band: np.zeros(shape=(2, 8, num_nodes))})
+                    # adj_mat = nri.eval_rln_ngh(jacobian, combined_ngh)
 
-                        # adj_mat = nri.eval_rln_ngh(jacobian, combined_ngh)
+                    pred_path = np.transpose(pred_path, (2, 1, 0))
+                    for i in range(1, num_nodes):
+                        try:
+                            if len(target_traj[i]) < args.pred_len:
+                                euc_loss = np.linalg.norm(
+                                    (pred_path[i][0:len(target_traj[i])] - target_traj[i]), ord=2) / len(
+                                    target_traj)
+                            else:
+                                euc_loss = np.linalg.norm(
+                                    (pred_path[i][0:args.pred_len] - target_traj[i][0:args.pred_len]),
+                                    ord=2) / len(target_traj)
+                                # np.linalg.norm((pred_path[i][0:len(target_traj[i])] - target_traj[i]), ord=2)
+                        except KeyError:
+                            i += 1
+                            continue
 
-                        pred_path = np.transpose(pred_path, (2, 1, 0))
-                        for i in range(1, num_nodes):
-                            try:
-                                if len(target_traj[i]) < args.pred_len:
-                                    euc_loss = np.linalg.norm(
-                                        (pred_path[i][0:len(target_traj[i])] - target_traj[i]), ord=2) / len(
-                                        target_traj)
-                                else:
-                                    euc_loss = np.linalg.norm(
-                                        (pred_path[i][0:args.pred_len] - target_traj[i][0:args.pred_len]),
-                                        ord=2) / len(target_traj)
-                                    # np.linalg.norm((pred_path[i][0:len(target_traj[i])] - target_traj[i]), ord=2)
-                            except KeyError:
-                                i += 1
-                                continue
+                end_t = time.time()
+                print('{0} seconds to complete'.format(end_t - start_t))
+                print('Frame {3} Batch {0} of {1}, Loss = {2}, ADE={4}, num_ped={5}'
+                      .format(b, dataloader.num_batches, krnl_mdl.cost, frame, euc_loss, len(target_traj)))
+                batch, target_traj, _ = dataloader.next_step()
 
-                    end_t = time.time()
-                    print('{0} seconds to complete'.format(end_t - start_t))
-                    print('Frame {3} Batch {0} of {1}, Loss = {2}, ADE={4}, num_ped={5}'
-                          .format(b, dataloader.num_batches, krnl_mdl.cost, frame, euc_loss, len(target_traj)))
-                    batch, target_traj, _ = dataloader.next_step()
+                graph_t = graph.ConstructGraph(current_batch=batch, framenum=frame, future_traj=target_traj)
+                batch_v = list(graph_t.get_node_attr(param='node_pos_list').values())
+                batch_v = np.transpose(batch_v)
+                num_nodes = batch_v.shape[1]
 
-                    graph_t = graph.ConstructGraph(current_batch=batch, framenum=frame, future_traj=target_traj)
-                    batch_v = list(graph_t.get_node_attr(param='node_pos_list').values())
-                    batch_v = np.transpose(batch_v)
-                    num_nodes = batch_v.shape[1]
+                with tf.variable_scope('weight_input'):
+                    init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
+                    weight_i = tf.Variable(name='weight_i',
+                                           initial_value=init_w(shape=(num_nodes, args.num_freq_blocks)),
+                                           trainable=True, dtype=tf.float64)
+                    weight_ii = tf.Variable(name='weight_ii',
+                                            initial_value=init_w(shape=(args.num_freq_blocks, args.input_size)),
+                                            trainable=True, dtype=tf.float64)
+                tf.initialize_variables(var_list=[weight_i, weight_ii]).run()
 
-                    with tf.variable_scope('weight_input'):
-                        init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
-                        weight_i = tf.Variable(name='weight_i',
-                                               initial_value=init_w(shape=(num_nodes, args.num_freq_blocks)),
-                                               trainable=True, dtype=tf.float64)
-                        weight_ii = tf.Variable(name='weight_ii',
-                                                initial_value=init_w(shape=(args.num_freq_blocks, args.input_size)),
-                                                trainable=True, dtype=tf.float64)
-                    tf.initialize_variables(var_list=[weight_i, weight_ii]).run()
+                inputs = tf.convert_to_tensor(batch_v, dtype=tf.float64)
+                inputs = tf.matmul(inputs, weight_i)
+                inputs = tf.matmul(weight_ii, inputs)
 
-                    inputs = tf.convert_to_tensor(batch_v, dtype=tf.float64)
-                    inputs = tf.matmul(inputs, weight_i)
-                    inputs = tf.matmul(weight_ii, inputs)
+                vislet = dataloader.vislet[:, frame:frame + num_nodes]  # tf.expand_dims(batch_v[0], axis=0)
+                vislet_emb = tf.matmul(vislet, weight_i)
 
-                    vislet = dataloader.vislet[:, frame:frame + num_nodes]  # tf.expand_dims(batch_v[0], axis=0)
-                    vislet_emb = tf.matmul(vislet, weight_i)
+                nghood_enc = helper.neighborhood_vis_loc_encoder(
+                    hidden_size=args.rnn_size,
+                    hidden_len=args.num_freq_blocks,
+                    num_layers=args.num_layers,
+                    grid_size=args.grid_size,
+                    embedding_size=args.embedding_size,
+                    dropout=args.dropout)
 
-                    nghood_enc = helper.neighborhood_vis_loc_encoder(
-                        hidden_size=args.rnn_size,
-                        hidden_len=args.num_freq_blocks,
-                        num_layers=args.num_layers,
-                        grid_size=args.grid_size,
-                        embedding_size=args.embedding_size,
-                        dropout=args.dropout)
+                stat_ngh = helper.neighborhood_stat_enc(
+                    hidden_size=args.rnn_size,
+                    num_layers=args.num_layers,
+                    grid_size=args.grid_size,
+                    dim=args.num_freq_blocks)
+                # num_nodes=args.num_freq_blocks,
+                # dropout=args.dropout)
 
-                    stat_ngh = helper.neighborhood_stat_enc(
-                        hidden_size=args.rnn_size,
-                        num_layers=args.num_layers,
-                        grid_size=args.grid_size,
-                        dim=args.num_freq_blocks)
-                    # num_nodes=args.num_freq_blocks,
-                    # dropout=args.dropout)
+                stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
+                stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
+                static_mask_nd = stat_mask.eval()
 
-                    stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
-                    stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
-                    static_mask_nd = stat_mask.eval()
+                krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
+                                            num_nodes=num_nodes, obs_len=args.seq_length,
+                                            lambda_reg=args.lambda_param)
 
-                    krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
-                                                num_nodes=num_nodes, obs_len=args.seq_length,
-                                                lambda_reg=args.lambda_param)
-
-                    # checkpoint_path = os.path.join('/home/serene/PycharmProjects/multimodaltraj/save',
-                    #                                'g2k_mcr_model_val_{0}.ckpt'.format(vb))
-                    # saver.save(sess, checkpoint_path, global_step=e * dataloader.num_batches + b)
-                    # print("model saved to {}".format(checkpoint_path))
+                # checkpoint_path = os.path.join('/home/serene/PycharmProjects/multimodaltraj/save',
+                #                                'g2k_mcr_model_val_{0}.ckpt'.format(vb))
+                # saver.save(sess, checkpoint_path, global_step=e * dataloader.num_batches + b)
+                # print("model saved to {}".format(checkpoint_path))
 
 
         #     for sequence in range(dataloader.batch_size):
