@@ -17,7 +17,7 @@ class DataLoader():
         datasets : The indices of the datasets to use
         forcePreProcess : Flag to forcefully preprocess the data again from csv files
         '''
-        parent_dir = '/home/siri0005/Documents/multimodaltraj_2/data'
+        parent_dir = '/home/siri0005/Documents/multimodaltraj/data'
         # '/fakepath/Documents/self-growing-spatial-graph/self-growing-gru-offline_avgPool/data'
         # '/Data/stanford_campus_dataset/annotations/'
         # List of data directories where world-coordinates data is stored
@@ -62,8 +62,8 @@ class DataLoader():
         self.batch_size = args.batch_size
         self.seq_length = args.seq_length
         self.pred_len = args.pred_len
-        self.obs_len = args.obs_len
-        self.diff = self.obs_len
+        self.obs_len = args.seq_length
+        self.diff = self.seq_length
 
         # Validation arguments
         # self.val_fraction = 0.2
@@ -135,7 +135,7 @@ class DataLoader():
         max_idx = max(self.frameList)
         # unique_frames = np.unique(self.frameList)
 
-        max_log = math.log(max_idx, self.diff)
+        max_log = math.log(max_idx, self.seq_length)
         idx = self.frame_pointer
         while b < self.batch_size:
             b += 1
@@ -150,7 +150,7 @@ class DataLoader():
             if c <= max_log:
                 # All the data in this sequence
                 # try:
-                rang = range(int(self.frame_pointer) , int(self.frame_pointer+(self.batch_size*self.obs_len)), self.diff)
+                rang = range(int(self.frame_pointer) , int(self.frame_pointer+(self.batch_size*self.obs_len)), self.obs_len)
                 try:
                     traj_batch = [{idx:self.trajectories[idx]} for idx in rang]
                 except KeyError:
@@ -185,7 +185,7 @@ class DataLoader():
                     except StopIteration:
                         break
                     # iter_traj = iter(self.trajectories[tmp])
-                self.frame_pointer += self.diff
+                self.frame_pointer += self.seq_length
             else:
                 self.tick_frame_pointer(valid=False)
 
@@ -224,7 +224,7 @@ class DataLoader():
         pickle.dump(frame_data, f, protocol=2)
         f.close()
 
-    def tick_frame_pointer(self, valid=False, incr = 8):
+    def tick_frame_pointer(self, valid=False, incr = 12):
         '''
         Advance the dataset pointer
         '''

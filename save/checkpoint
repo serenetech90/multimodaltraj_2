@@ -1,0 +1,2 @@
+model_checkpoint_path: "/home/siri0005/Documents/multimodaltraj/save/g2k_mcr_model_val_60.ckpt-60"
+all_model_checkpoint_paths: "/home/siri0005/Documents/multimodaltraj/save/g2k_mcr_model_val_60.ckpt-60"
