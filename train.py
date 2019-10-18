@@ -88,7 +88,7 @@ def train(args):
     with tf.Session(graph=tf_graph) as sess:
         with sess.as_default():
             dataloader = load.DataLoader(args=args, datasets=[0, 1, 2, 3, 4, 5], start=2, sel=0)
-            for d in range(2,5):
+            for d in range(4,5):
                 log_dir = '/home/siri0005/Documents/multimodaltraj/log/error_log_{0}.txt'.format(d)
                 log_f = open(log_dir,'w')
                 target_traj = []
@@ -245,7 +245,6 @@ def train(args):
                             c_hidden_init = tf.zeros(dtype=tf.float64,shape=(args.num_freq_blocks,(args.grid_size * (args.grid_size/2))))
 
                         # tf.initialize_variables(var_list=[weight_i, weight_ii]).run()
-
                         # sess.run(tf.initialize_all_variables())
                         # checkpoint_path = os.path.join('/home/siri0005/Documents/multimodaltraj/save',
                         #                                'g2k_mcr_model_val_{0}.ckpt'.format(b))
@@ -452,7 +451,7 @@ def train(args):
                     # make another model file with attn
 
                     if (e * dataloader.num_batches + b) % args.save_every == 0 and ((e * dataloader.num_batches + b) > 0):
-                        checkpoint_path = os.path.join('/home/siri0005/Documents/multimodaltraj/save', 'g2k_mcr_model_val_{0}.ckpt'.format(b))
+                        checkpoint_path = os.path.join('/home/siri0005/Documents/multimodaltraj/save', 'g2k_mcr_model_val_{1}_{0}.ckpt'.format(b,d))
                         saver.save(sess, checkpoint_path, global_step=e * dataloader.num_batches + b)
                         print("model saved to {}".format(checkpoint_path))
 
