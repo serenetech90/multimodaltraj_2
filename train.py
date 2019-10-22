@@ -1,5 +1,6 @@
 import time
 from models import g2k_lstm_mcr as mcr
+from models import gsk_lstm_cell as g2k
 import argparse
 import nri_learned as nri
 import networkx_graph as nx_g
@@ -88,8 +89,8 @@ def train(args):
     with tf.Session(graph=tf_graph) as sess:
         with sess.as_default():
             dataloader = load.DataLoader(args=args, datasets=[0, 1, 2, 3, 4, 5], start=2, sel=0)
-            for d in range(4,5):
-                log_dir = '/home/siri0005/Documents/multimodaltraj/log/error_log_{0}.txt'.format(d)
+            for d in range(3,5):
+                log_dir = '/home/siri0005/Documents/multimodaltraj/log/g2k_lstm_error_log_{0}.txt'.format(d)
                 log_f = open(log_dir,'w')
                 target_traj = []
                 true_path = []
@@ -173,7 +174,9 @@ def train(args):
                     batch, target_traj, _ = dataloader.next_step()
 
                     if len(batch) == 0:
-                        break
+                        # try re-training over the same data, may cause overfitting
+                        # need to engage k-fold CV
+                        dataloader.reset_data_pointer()
 
                     if e == 0:
                         graph_t = graph.ConstructGraph(current_batch=batch, framenum=frame, future_traj=target_traj)
@@ -205,22 +208,23 @@ def train(args):
                             embedding_size=args.embedding_size,
                             dropout=args.dropout)
 
-                        stat_ngh = helper.neighborhood_stat_enc(
-                            hidden_size=args.rnn_size,
-                            num_layers=args.num_layers,
-                            grid_size=args.grid_size,
-                            dim=args.num_freq_blocks)
+                        # stat_ngh = helper.neighborhood_stat_enc(
+                        #     hidden_size=args.rnn_size,
+                        #     num_layers=args.num_layers,
+                        #     grid_size=args.grid_size,
+                        #     dim=args.num_freq_blocks)
                         # num_nodes=args.num_freq_blocks,
                         # dropout=args.dropout)
+                        # stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
+                        # stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
+                        # static_mask_nd = stat_mask.eval()
 
-                        stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
-                        stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
-                        static_mask_nd = stat_mask.eval()
-
-                        krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
+                        # krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
+                        #                             num_nodes=num_nodes, obs_len=args.seq_length,
+                        #                             lambda_reg=args.lambda_param)
+                        krnl_mdl = g2k.gsk_lstm_cell(in_features=nghood_enc.input, out_size=batch_v.shape[1],
                                                     num_nodes=num_nodes, obs_len=args.seq_length,
                                                     lambda_reg=args.lambda_param)
-
                         tf.initialize_variables(
                             var_list=[krnl_mdl.bias_v, krnl_mdl.weight_c, krnl_mdl.weight_o, krnl_mdl.weight_v]).run()
                         sess.run(fetches=tf.initialize_all_variables())
@@ -237,8 +241,8 @@ def train(args):
 
                         start_t = time.time()
 
-                        vislet = dataloader.vislet[:, frame:frame + num_nodes]
-                        vislet_emb = tf.matmul(vislet, weight_i)
+                        # vislet = dataloader.vislet[:, frame:frame + num_nodes]
+                        # vislet_emb = tf.matmul(vislet, weight_i)
 
                         with tf.variable_scope('nghood_init'):
                             out_init = tf.zeros(dtype=tf.float64,shape=(args.num_freq_blocks, (args.grid_size * (args.grid_size/2))))
@@ -294,18 +298,18 @@ def train(args):
                                                    nghood_enc.c_hidden_state: c_hidden_init.eval()})
 
 
-                            static_mask, social_frame = sess.run([static_mask, output] ,
-                                                                feed_dict={static_mask: static_mask_nd,
-                                                                           social_frame:ng_output,
-                                                                           state_f00_b00_c: hidden_state,
-                                                                           output: out_init.eval(),
-                                                                           c_hidden_states: c_hidden_init.eval()
-                                                                })
+                            # static_mask, social_frame = sess.run([static_mask, output] ,
+                            #                                     feed_dict={static_mask: static_mask_nd,
+                            #                                                social_frame:ng_output,
+                            #                                                state_f00_b00_c: hidden_state,
+                            #                                                output: out_init.eval(),
+                            #                                                c_hidden_states: c_hidden_init.eval()
+                            #                                     })
 
-                            input = tf.matmul(b=static_mask, a=social_frame).eval()  # Soft-attention mechanism equipped with static grid
-                            combined_ngh, hidden_state = sess.run([stat_ngh.input, stat_ngh.hidden_state] ,
-                                                                  feed_dict={stat_ngh.input:input,
-                                                                             stat_ngh.hidden_state:hidden_state})
+                            # input = tf.matmul(b=static_mask, a=social_frame).eval()  # Soft-attention mechanism equipped with static grid
+                            # combined_ngh, hidden_state = sess.run([stat_ngh.input, stat_ngh.hidden_state] ,
+                            #                                       feed_dict={stat_ngh.input:input,
+                            #                                                  stat_ngh.hidden_state:hidden_state})
 
                             # st_embeddings, hidden_state = nghood_enc.forward(batch_v, hidden_state)
                             # input_size=args.input_size,
@@ -369,10 +373,11 @@ def train(args):
                             pred_path, jacobian = \
                                 sess.run([krnl_mdl.pred_path_band, krnl_mdl.cost],
                                          feed_dict={
-                                             krnl_mdl.outputs: np.concatenate((st_embeddings, vislet_emb.eval()), axis=0),
-                                             krnl_mdl.ngh: args.lambda_param * combined_ngh,
+                                             krnl_mdl.outputs:st_embeddings,
+                                             # krnl_mdl.outputs: np.concatenate((st_embeddings, vislet_emb.eval()), axis=0),
+                                             krnl_mdl.ngh: np.transpose(args.lambda_param * ng_output), #combined_ngh,
                                              # krnl_mdl.lambda_reg: args.lambda_reg,
-                                             krnl_mdl.pred_path_band: np.zeros(shape=(2, 8, num_nodes))})
+                                             krnl_mdl.pred_path_band: tf.random_normal(shape=(2, 8, num_nodes)).eval()})
 
                             # sess.run(tf.initialize_all_variables())
                             # adj_mat = nri.eval_rln_ngh(jacobian, combined_ngh)
@@ -381,6 +386,7 @@ def train(args):
                             for i in range(1,num_nodes):
                                 try:
                                     if len(target_traj[i]) < args.pred_len:
+                                        krnl_mdl.pred_path_band.eval()
                                         euc_loss = np.linalg.norm((pred_path[i][0:len(target_traj[i])] - target_traj[i]), ord=2)/len(target_traj)
                                     else:
                                         euc_loss = np.linalg.norm((pred_path[i][0:args.pred_len] - target_traj[i][0:args.pred_len]), ord=2)/len(target_traj)
@@ -421,21 +427,23 @@ def train(args):
                             embedding_size=args.embedding_size,
                             dropout=args.dropout)
 
-                        stat_ngh = helper.neighborhood_stat_enc(
-                            hidden_size=args.rnn_size,
-                            num_layers=args.num_layers,
-                            grid_size=args.grid_size,
-                            dim=args.num_freq_blocks)
+                        # stat_ngh = helper.neighborhood_stat_enc(
+                        #     hidden_size=args.rnn_size,
+                        #     num_layers=args.num_layers,
+                        #     grid_size=args.grid_size,
+                        #     dim=args.num_freq_blocks)
                         # num_nodes=args.num_freq_blocks,
                         # dropout=args.dropout)
-
-                        stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
-                        stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
-                        static_mask_nd = stat_mask.eval()
-
-                        krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
+                        #
+                        # stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
+                        # stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
+                        # static_mask_nd = stat_mask.eval()
+                        krnl_mdl = g2k.gsk_lstm_cell(in_features=nghood_enc.input, out_size=batch_v.shape[1],
                                                     num_nodes=num_nodes, obs_len=args.seq_length,
                                                     lambda_reg=args.lambda_param)
+                        # krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
+                        #                             num_nodes=num_nodes, obs_len=args.seq_length,
+                        #                             lambda_reg=args.lambda_param)
 
                         tf.initialize_variables(
                             var_list=[krnl_mdl.bias_v, krnl_mdl.weight_c, krnl_mdl.weight_o, krnl_mdl.weight_v]).run()
@@ -451,7 +459,7 @@ def train(args):
                     # make another model file with attn
 
                     if (e * dataloader.num_batches + b) % args.save_every == 0 and ((e * dataloader.num_batches + b) > 0):
-                        checkpoint_path = os.path.join('/home/siri0005/Documents/multimodaltraj/save', 'g2k_mcr_model_val_{1}_{0}.ckpt'.format(b,d))
+                        checkpoint_path = os.path.join('/home/siri0005/Documents/multimodaltraj/save', 'g2k_model_val_{1}_{0}.ckpt'.format(b,d))
                         saver.save(sess, checkpoint_path, global_step=e * dataloader.num_batches + b)
                         print("model saved to {}".format(checkpoint_path))
 
@@ -534,27 +542,28 @@ def train(args):
                                             nghood_enc.output: out_init.eval(),
                                             nghood_enc.c_hidden_state: c_hidden_init.eval()})
 
-                    static_mask, social_frame = sess.run([static_mask, output],
-                                                         feed_dict={static_mask: static_mask_nd,
-                                                                    social_frame: ng_output,
-                                                                    state_f00_b00_c: hidden_state,
-                                                                    output: out_init.eval(),
-                                                                    c_hidden_states: c_hidden_init.eval()
-                                                                    })
+                    # static_mask, social_frame = sess.run([static_mask, output],
+                    #                                      feed_dict={static_mask: static_mask_nd,
+                    #                                                 social_frame: ng_output,
+                    #                                                 state_f00_b00_c: hidden_state,
+                    #                                                 output: out_init.eval(),
+                    #                                                 c_hidden_states: c_hidden_init.eval()
+                    #                                                 })
 
-                    input = tf.matmul(b=static_mask,
-                                      a=social_frame).eval()  # Soft-attention mechanism equipped with static grid
-                    combined_ngh, hidden_state = sess.run([stat_ngh.input, stat_ngh.hidden_state],
-                                                          feed_dict={stat_ngh.input: input,
-                                                                     stat_ngh.hidden_state: hidden_state})
+                    # input = tf.matmul(b=static_mask,
+                    #                   a=social_frame).eval()  # Soft-attention mechanism equipped with static grid
+                    # comsbined_ngh, hidden_state = sess.run([stat_ngh.input, stat_ngh.hidden_state],
+                    #                                       feed_dict={stat_ngh.input: input,
+                    #                                                  stat_ngh.hidden_state: hidden_state})
                     pred_path, jacobian = \
                         sess.run([krnl_mdl.pred_path_band, krnl_mdl.cost],
                                  feed_dict={
-                                     krnl_mdl.outputs: np.concatenate((st_embeddings, vislet_emb.eval()),
-                                                                      axis=0),
-                                     krnl_mdl.ngh: args.lambda_param * combined_ngh,
+                                     krnl_mdl.outputs:st_embeddings,
+                                     # krnl_mdl.outputs: np.concatenate((st_embeddings, vislet_emb.eval()),
+                                     #                                  axis=0),
+                                     krnl_mdl.ngh: args.lambda_param * ng_output,#args.lambda_param * combined_ngh,
                                      # krnl_mdl.lambda_reg: args.lambda_reg,
-                                     krnl_mdl.pred_path_band: np.zeros(shape=(2, 8, num_nodes))})
+                                     krnl_mdl.pred_path_band: tf.random_normal(shape=(2, 8, num_nodes)).eval()})
 
                     # adj_mat = nri.eval_rln_ngh(jacobian, combined_ngh)
 
@@ -599,9 +608,9 @@ def train(args):
                 inputs = tf.convert_to_tensor(batch_v, dtype=tf.float64)
                 inputs = tf.matmul(inputs, weight_i)
                 inputs = tf.matmul(weight_ii, inputs)
-
-                vislet = dataloader.vislet[:, frame:frame + num_nodes]  # tf.expand_dims(batch_v[0], axis=0)
-                vislet_emb = tf.matmul(vislet, weight_i)
+                #
+                # vislet = dataloader.vislet[:, frame:frame + num_nodes]  # tf.expand_dims(batch_v[0], axis=0)
+                # vislet_emb = tf.matmul(vislet, weight_i)
 
                 nghood_enc = helper.neighborhood_vis_loc_encoder(
                     hidden_size=args.rnn_size,
@@ -611,21 +620,23 @@ def train(args):
                     embedding_size=args.embedding_size,
                     dropout=args.dropout)
 
-                stat_ngh = helper.neighborhood_stat_enc(
-                    hidden_size=args.rnn_size,
-                    num_layers=args.num_layers,
-                    grid_size=args.grid_size,
-                    dim=args.num_freq_blocks)
+                # stat_ngh = helper.neighborhood_stat_enc(
+                #     hidden_size=args.rnn_size,
+                #     num_layers=args.num_layers,
+                #     grid_size=args.grid_size,
+                #     dim=args.num_freq_blocks)
                 # num_nodes=args.num_freq_blocks,
                 # dropout=args.dropout)
 
-                stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
-                stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
-                static_mask_nd = stat_mask.eval()
-
-                krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
+                # stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
+                # stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
+                # static_mask_nd = stat_mask.eval()
+                krnl_mdl = g2k.gsk_lstm(in_features=nghood_enc.input, out_size=batch_v.shape[1],
                                             num_nodes=num_nodes, obs_len=args.seq_length,
                                             lambda_reg=args.lambda_param)
+                # krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
+                #                             num_nodes=num_nodes, obs_len=args.seq_length,
+                #                             lambda_reg=args.lambda_param)
 
                 # checkpoint_path = os.path.join('/home/serene/PycharmProjects/multimodaltraj/save',
                 #                                'g2k_mcr_model_val_{0}.ckpt'.format(vb))
