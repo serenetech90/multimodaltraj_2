@@ -17,7 +17,7 @@ class DataLoader():
         datasets : The indices of the datasets to use
         forcePreProcess : Flag to forcefully preprocess the data again from csv files
         '''
-        parent_dir = '/home/serene/PycharmProjects/multimodaltraj/data'
+        parent_dir = '/home/siri0005/Documents/multimodaltraj/data'
         # '/fakepath/Documents/self-growing-spatial-graph/self-growing-gru-offline_avgPool/data'
         # '/Data/stanford_campus_dataset/annotations/'
         # List of data directories where world-coordinates data is stored
@@ -25,11 +25,12 @@ class DataLoader():
         self.data_dirs = [
             parent_dir + '/eth/hotel/',
             parent_dir + '/eth/univ/',
-            parent_dir + '/ucy/zara/zara02/',
             parent_dir + '/ucy/zara/zara01/',
+            parent_dir + '/ucy/zara/zara02/',
             parent_dir + '/ucy/univ/',
             parent_dir + '/annotation_tc.txt'
             ]
+
         # parent_dir + '/stanford/bookstore/',
         # parent_dir + '/stanford/hyang/',
         # parent_dir + '/stanford/coupa/',
@@ -47,6 +48,7 @@ class DataLoader():
         # parent_dir + '/hotel/',
         # parent_dir + '/zara/',
         # parent_dir + '/crowds/',
+
         self.used_data_dirs = [self.data_dirs[x] for x in datasets]
         self.infer = infer
 
@@ -149,7 +151,11 @@ class DataLoader():
                 # All the data in this sequence
                 # try:
                 rang = range(int(self.frame_pointer) , int(self.frame_pointer+(self.batch_size*self.obs_len)), self.obs_len)
-                traj_batch = [{idx:self.trajectories[idx]} for idx in rang]
+                try:
+                    traj_batch = [{idx:self.trajectories[idx]} for idx in rang]
+                except KeyError:
+                    break
+
                 iter_traj = iter(traj_batch)
                 for idx in traj_batch:#range(int(self.frame_pointer), int(self.frame_pointer+self.obs_len+1)):
                     (idx , _), = idx.items()
@@ -237,7 +243,7 @@ class DataLoader():
         '''
         if not valid:
             # Go to the first frame of the first dataset
-            self.dataset_pointer = 0
+            # self.dataset_pointer = 0
             self.frame_pointer = self.seed
         else:
             self.dataset_pointer = dataset_pointer
