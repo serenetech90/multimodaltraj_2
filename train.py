@@ -30,15 +30,17 @@ def main():
     parser.add_argument('--model', type=str, default='lstm',
                         help='rnn, gru, or lstm')
     # Size of each batch parameter
-    parser.add_argument('--batch_size', type=int, default=4, # read 16 frames at once containing all related pedestrians and their trajectories
+    parser.add_argument('--batch_size', type=int, default=16, # read 16 frames at once containing all related pedestrians and their trajectories
                         help='minibatch size')
     # Length of sequence to be considered parameter
-    parser.add_argument('--seq_length', type=int, default=8,
+    parser.add_argument('--seq_length', type=int, default=12,
                         help='RNN sequence length')
-    parser.add_argument('--pred_len', type=int, default=8,
+    parser.add_argument('--obs_len', type=int, default=8,
+                        help='RNN sequence length')
+    parser.add_argument('--pred_len', type=int, default=12,
                         help='number of layers in the RNN')
     # Number of epochs parameter
-    parser.add_argument('--num_epochs', type=int, default=100,
+    parser.add_argument('--num_epochs', type=int, default=50,
                         help='number of epochs')
     # Frequency at which the model should be saved parameter
     parser.add_argument('--save_every', type=int, default=10,
@@ -88,8 +90,9 @@ def train(args):
     tf_graph = tf.Graph()
     with tf.Session(graph=tf_graph) as sess:
         with sess.as_default():
-            # dataloader = load.DataLoader(args=args, datasets=[0, 1, 2, 3, 4, 5], start=2, sel=0)
-            for d in {3}: #range(3,3):
+            log_count = '/home/siri0005/Documents/multimodaltraj/log/g2k_lstm_counts.txt'
+            log_count_f = open(log_count, 'w')
+            for d in {2, 3, 4}: #range(2,5):
                 log_dir = '/home/siri0005/Documents/multimodaltraj/log/g2k_lstm_error_log_{0}.txt'.format(d)
                 log_f = open(log_dir,'w')
                 target_traj = []
@@ -224,7 +227,7 @@ def train(args):
                         #                             num_nodes=num_nodes, obs_len=args.seq_length,
                         #                             lambda_reg=args.lambda_param)
                         krnl_mdl = g2k.gsk_lstm_cell(in_features=nghood_enc.input, out_size=batch_v.shape[1],
-                                                    num_nodes=num_nodes, obs_len=args.seq_length,
+                                                    num_nodes=num_nodes, obs_len=args.obs_len,
                                                     lambda_reg=args.lambda_param)
                         tf.initialize_variables(
                             var_list=[krnl_mdl.bias_v, krnl_mdl.weight_c, krnl_mdl.weight_o, krnl_mdl.weight_v]).run()
@@ -376,15 +379,15 @@ def train(args):
                                              # krnl_mdl.outputs: np.concatenate((st_embeddings, vislet_emb.eval()), axis=0),
                                              krnl_mdl.ngh: np.transpose(args.lambda_param * ng_output), #combined_ngh,
                                              # krnl_mdl.lambda_reg: args.lambda_reg,
-                                             krnl_mdl.pred_path_band: tf.random_normal(shape=(2, 8, num_nodes)).eval()})
+                                             krnl_mdl.pred_path_band: tf.random_normal(shape=(2, args.pred_len, num_nodes)).eval()})
 
                             # sess.run(tf.initialize_all_variables())
                             # adj_mat = nri.eval_rln_ngh(jacobian, combined_ngh)
 
                             pred_path = np.transpose(krnl_mdl.pred_path_band.eval(), (2,1,0))
+                            num_targets += num_nodes
                             for i in range(1,num_nodes):
                                 try:
-                                    num_targets += len(target_traj[i])
                                     if len(target_traj[i]) < args.pred_len:
                                         euc_loss.append(pred_path[i][0:len(target_traj[i])] - target_traj[
                                             i])  # , ord=2) / len(target_traj)
@@ -435,12 +438,12 @@ def train(args):
                         #     dim=args.num_freq_blocks)
                         # num_nodes=args.num_freq_blocks,
                         # dropout=args.dropout)
-                        #
                         # stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
                         # stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
                         # static_mask_nd = stat_mask.eval()
+
                         krnl_mdl = g2k.gsk_lstm_cell(in_features=nghood_enc.input, out_size=batch_v.shape[1],
-                                                    num_nodes=num_nodes, obs_len=args.seq_length,
+                                                    num_nodes=num_nodes, obs_len=args.obs_len,
                                                     lambda_reg=args.lambda_param)
                         # krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
                         #                             num_nodes=num_nodes, obs_len=args.seq_length,
@@ -465,9 +468,11 @@ def train(args):
                         print("model saved to {}".format(checkpoint_path))
 
                     e_end = time.time()
-                    print('Epoch time taken: ', (e_end - e_start))
+                    print('Epoch {0} time taken: ', (e_end - e_start , e))
 
+                log_count_f.write('{0}={1}'.format(d, num_targets))
                 log_f.close()
+            log_count_f.close()
 
                 #*************************************************************** VALIDATION *************************************
 
@@ -564,7 +569,7 @@ def train(args):
                                      #                                  axis=0),
                                      krnl_mdl.ngh: np.transpose(args.lambda_param * ng_output),#args.lambda_param * combined_ngh,
                                      # krnl_mdl.lambda_reg: args.lambda_reg,
-                                     krnl_mdl.pred_path_band: tf.random_normal(shape=(2, 8, num_nodes)).eval()})
+                                     krnl_mdl.pred_path_band: tf.random_normal(shape=(2, args.pred_len, num_nodes)).eval()})
 
                     # adj_mat = nri.eval_rln_ngh(jacobian, combined_ngh)
 
@@ -633,7 +638,7 @@ def train(args):
                 # stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
                 # static_mask_nd = stat_mask.eval()
                 krnl_mdl = g2k.gsk_lstm_cell(in_features=nghood_enc.input, out_size=batch_v.shape[1],
-                                            num_nodes=num_nodes, obs_len=args.seq_length,
+                                            num_nodes=num_nodes, obs_len=args.obs_len,
                                             lambda_reg=args.lambda_param)
                 # krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input, out_size=batch_v.shape[1],
                 #                             num_nodes=num_nodes, obs_len=args.seq_length,
