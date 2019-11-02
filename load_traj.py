@@ -17,7 +17,7 @@ class DataLoader():
         datasets : The indices of the datasets to use
         forcePreProcess : Flag to forcefully preprocess the data again from csv files
         '''
-        parent_dir = '/home/siri0005/Documents/multimodaltraj/data'
+        parent_dir = '/home/siri0005/Documents/multimodaltraj_2/data'
         # '/fakepath/Documents/self-growing-spatial-graph/self-growing-gru-offline_avgPool/data'
         # '/Data/stanford_campus_dataset/annotations/'
         # List of data directories where world-coordinates data is stored
