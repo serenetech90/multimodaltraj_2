@@ -6,21 +6,21 @@ class gsk_lstm_cell():
         self.lambda_reg = tf.Variable(lambda_reg, dtype=tf.float64)
         self.init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0, dtype=tf.float64)
 
-        self.outputs = tf.placeholder_with_default(input=tf.random.normal(shape=[int(in_features.shape[0]),
-                                                                                 int(in_features.shape[0])],
-                                                                          mean=0, stddev=1, seed=0, dtype=tf.float64),
-                                                   # dtype=tf.float64,
-                                                   shape=[int(in_features.shape[0]),
-                                                          int(in_features.shape[0])], name="outputs")
+        self.outputs = tf.placeholder_with_default(
+                                        input=tf.random.normal(shape=[int(in_features.shape[0]),
+                                        int(in_features.shape[0])],mean=0, stddev=1, seed=0, dtype=tf.float64),
+                                        shape=[int(in_features.shape[0]),
+                                              int(in_features.shape[0])], name="outputs")
+
         self.ngh = tf.placeholder_with_default(
-            input=tf.random.normal(shape=[obs_len , int(in_features.shape[0])],
+            input=tf.random.normal(shape=[12 , int(in_features.shape[0])],
                                    mean=0, stddev=1, seed=0, dtype=tf.float64),
-            shape=[obs_len , int(in_features.shape[0])], name="ngh")
+            shape=[12 , int(in_features.shape[0])], name="ngh")
 
 
         with tf.variable_scope("krnl_weights"):
             self.weight_v = tf.Variable(name='weight_v', initial_value= \
-                                        self.init_w(shape=(obs_len, int(in_features.shape[0]))),
+                                        self.init_w(shape=(12, int(in_features.shape[0]))),
                                         # shape=tf.shape(1,in_features.shape[1].value),
                                         dtype=tf.float64)
 
@@ -35,7 +35,7 @@ class gsk_lstm_cell():
                                         dtype=tf.float64)
 
             self.weight_c = tf.Variable(name='weight_c', initial_value= \
-                                        self.init_w(shape=(24, obs_len)),
+                                        self.init_w(shape=(16, obs_len)),
                                         # shape=tf.shape(1,in_features.shape[1].value),
                                         dtype=tf.float64)
 
@@ -57,7 +57,7 @@ class gsk_lstm_cell():
                                     unconnected_gradients='zero')
 
         self.cost = tf.squeeze(self.cost)
-        self.cost = tf.nn.relu(self.cost) #relu will affect range of data. Will not use it in future
+        self.cost = tf.nn.relu(self.cost)
 
         self.temp_path = tf.Variable(tf.matmul(self.weight_c, self.cost))  # 16x10
         self.temp_path = tf.Variable(tf.matmul(self.temp_path, self.weight_o))  # 16xn

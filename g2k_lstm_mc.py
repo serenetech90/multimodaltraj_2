@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-class g2k_lstm_mcr():
+class g2k_lstm_mc():
     def __init__(self, in_features, out_size, obs_len, num_nodes, lambda_reg):
         # super(g2k_lstm_mcr).__init__()
         # self.relu = tf.nn.relu_layer()
@@ -61,7 +61,7 @@ class g2k_lstm_mcr():
                                     unconnected_gradients='zero')
 
         self.cost = tf.squeeze(self.cost)
-        self.cost = tf.nn.relu(self.cost)
+        # self.cost = tf.nn.relu(self.cost)
 
         self.temp_path = tf.Variable(tf.matmul(self.weight_c, self.cost))  # 16x10
         self.temp_path = tf.Variable(tf.matmul(self.temp_path, self.weight_o))  # 16xn
