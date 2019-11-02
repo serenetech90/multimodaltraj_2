@@ -8,6 +8,7 @@ import networkx_graph as nx
 from torch.nn import functional as F
 import torch.cuda
 
+
 class g2k_lstm_mcr():
     def __init__(self, in_features, out_size, obs_len, num_nodes, lambda_reg):
         # super(g2k_lstm_mcr).__init__()
@@ -38,21 +39,24 @@ class g2k_lstm_mcr():
         #                           # shape=(in_features.shape[1].value, 1),
         #                           dtype=tf.float64)
 
-        self.weight_v = tf.Variable(name='weight_v', initial_value= \
-            self.init_w(shape=(8,int(in_features.shape[0])+2)),
-            # shape=tf.shape(1,in_features.shape[1].value),
-            dtype=tf.float64)
 
-        self.bias_v = tf.Variable(name='bias_v', initial_value= \
-            self.init_w(shape=(int(in_features.shape[0]),)),
-            # shape=tf.shape(1,in_features.shape[1].value),
-            dtype=tf.float64)
 
         with tf.variable_scope("krnl_weights"):
+            self.weight_v = tf.Variable(name='weight_v', initial_value= \
+                                        self.init_w(shape=(8, int(in_features.shape[0]) + 2)),
+                                        # shape=tf.shape(1,in_features.shape[1].value),
+                                        dtype=tf.float64)
+
+            self.bias_v = tf.Variable(name='bias_v', initial_value= \
+                                      self.init_w(shape=(int(in_features.shape[0]),)),
+                                      # shape=tf.shape(1,in_features.shape[1].value),
+                                      dtype=tf.float64)
+
             self.weight_o = tf.Variable(name='weight_o', initial_value= \
                                         self.init_w(shape=(int(in_features.shape[0]), num_nodes)),
                                         # shape=tf.shape(1,in_features.shape[1].value),
                                         dtype=tf.float64)
+
             self.weight_c = tf.Variable(name='weight_c', initial_value= \
                                         self.init_w(shape=(16, obs_len)),
                                         # shape=tf.shape(1,in_features.shape[1].value),
@@ -77,7 +81,14 @@ class g2k_lstm_mcr():
         embedded_spatial_vislet = tf.Variable(tf.matmul(self.weight_v, self.outputs) + self.bias_v) # 8x10
         # ngh_temp = tf.Variable((self.lambda_reg * self.ngh) )# 8x10
         ngh_temp = tf.Variable(tf.matmul(embedded_spatial_vislet , self.ngh))
+        self.cost = tf.gradients(ys=ngh_temp, xs=embedded_spatial_vislet, unconnected_gradients='zero')
+        self.cost = tf.squeeze(self.cost)
+        self.cost = tf.nn.relu(self.cost)
 
+        self.temp_path = tf.Variable(tf.matmul(self.weight_c, self.cost))  # 16x10
+        self.temp_path = tf.Variable(tf.matmul(self.temp_path, self.weight_o))  # 16xn
+
+        self.pred_path_band = tf.reshape(self.temp_path, (2, 8, self.out_size))  # 2x8xn
         # ngh = tf.Variable(initial_value=tf.multiply(embedded_spatial_vislet, ngh),
         #                   trainable=True,
         #                   name='ngh')
@@ -94,16 +105,11 @@ class g2k_lstm_mcr():
         # determined by social embedded features.
         # ys_temp = tf.zeros_like(self.ngh)
 
-        self.cost = tf.gradients(ys=ngh_temp, xs=embedded_spatial_vislet, unconnected_gradients='zero')
-        self.cost = tf.squeeze(self.cost)
-        self.cost = tf.nn.relu(self.cost)
+
         # self.cost = tf.transpose(self.cost)
         # self.cost = tf.matmul(self.ngh, self.outputs)
 
-        self.temp_path = tf.Variable(tf.matmul(self.weight_c, self.cost)) # 16x10
-        self.temp_path = tf.Variable(tf.matmul(self.temp_path, self.weight_o)) # 16xn
 
-        self.pred_path_band = tf.reshape(self.temp_path, (2, 8, self.out_size)) # 2x8xn
 
         # pred_path_band = tf.matmul(self.weight_k, tf.squeeze(self.cost)) + self.bias_k
         # pred_path_band = tf.nn.xw_plus_b(x=tf.transpose(d_outputs), weights=self.weight_k, biases=self.bias_k)
