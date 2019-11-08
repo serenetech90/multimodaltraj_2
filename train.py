@@ -295,8 +295,8 @@ def train(args):
                                         # np.linalg.norm((pred_path[i][0:len(target_traj[i])] - target_traj[i]), ord=2)
 
                                     print('ADE= ',
-                                          np.linalg.norm(euc_loss[len(euc_loss) - 1], ord=2) / (num_nodes * 12), \
-                                          ' FDE= ', np.linalg.norm(fde[len(fde) - 1], ord=2) / num_nodes)
+                                          np.linalg.norm(euc_loss[len(euc_loss) - 1], ord=2) / 12, \
+                                          ' FDE= ', np.linalg.norm(fde[len(fde) - 1], ord=2) )
 
                                 except KeyError:
                                     i += 1
