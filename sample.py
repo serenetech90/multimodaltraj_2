@@ -1,5 +1,6 @@
 import pickle
 from models import g2k_lstm_mcr as mcr
+from models import g2k_lstm_mc as mc
 import argparse
 import time
 import networkx_graph as nx_g
@@ -76,8 +77,8 @@ def get_mean_error(predicted_traj, true_traj, observed_length, maxNumPeds):
         # error[i-observed_length] = np.linalg.norm(true_pos - pred_pos)
 
     # Return the mean error
-    print('ADE = ', np.mean(np.linalg.norm(error,ord=2,axis=1)/counter))
-    print('FDE = ', np.mean(np.linalg.norm(np.stack(fde_error), ord=2, axis=1) / fde_counter))
+    print('ADE = ', np.mean(np.linalg.norm(error,ord=2,axis=1)/(counter)))
+    print('FDE = ', np.mean(np.linalg.norm(np.stack(fde_error), ord=2, axis=1) / maxNumPeds))
     return np.mean(np.linalg.norm(error,ord=2,axis=1)/counter), np.mean(np.linalg.norm(np.stack(fde_error), ord=2, axis=1) / fde_counter) , counter # np.mean(error)
 
 
@@ -94,18 +95,18 @@ def main():
     parser.add_argument('--pred_length', type=int, default=12,
                         help='Predicted length of the trajectory')
     # Test dataset
-    parser.add_argument('--test_dataset', type=int, default=4,
+    parser.add_argument('--test_dataset', type=int, default=5,
                         help='Dataset to be tested on')
 
     # Model to be loaded
-    parser.add_argument('--epoch', type=int, default=1,
+    parser.add_argument('--epoch', type=int, default=2,
                         help='Epoch of model to be loaded')
 
     # Parse the parameters
     sample_args = parser.parse_args()
 
     # Save directory
-    save_directory = '/home/serene/PycharmProjects/multimodaltraj_2/save'
+    save_directory = '/home/serene/PycharmProjects/multimodaltraj_2/ablations/save'
 
     # Define the path for the config file for saved args
     # with open(os.path.join(save_directory, 'social_config.pkl'), 'rb') as f:
@@ -124,7 +125,7 @@ def main():
     data_loader.reset_data_pointer()
 
     c_soft = 1
-    frame = 1
+    frame = 0
     results = []
     vislet_emb = None
     dim = int(args.neighborhood_size / args.grid_size)
@@ -142,25 +143,27 @@ def main():
         else:
             vislet_past = 1
 
-        if b == 38:
-            print()
+        if len(x_batch) == 0:
+            break
         # for i in range(args.obs_len):
 
         graph = nx_g.online_graph(args)
         graph_t = graph.ConstructGraph(current_batch=x_batch, framenum=frame, future_traj=y_batch)
         batch_v = list(graph_t.get_node_attr(param='node_pos_list').values())
-        if len(np.array(batch_v).shape) > 1:
+        if len(np.array(batch_v).shape) > 2:
             batch_v = np.array(batch_v)[:, frame:frame+args.obs_len]
+            batch_v = np.linalg.norm(batch_v, axis=2)
+            num_nodes = batch_v.shape[0]
         else:
             batch_v = np.array(batch_v)[frame:frame + args.obs_len]
-            break
-        #     batch_v = np.array(batch_v)[frame:frame+args.obs_len]
+            # batch_v = np.expand_dims(np.linalg.norm(batch_v, axis=1),axis=1)
+            num_nodes = len(batch_v)
+        #     break
+        # batch_v = np.array(batch_v)[frame:frame+args.obs_len]
 
-        batch_v = np.linalg.norm(batch_v,axis=2)
         batch_v = np.transpose(batch_v)
         # Batch size is 1
         # x_batch, y_batch, d_batch, x_batch_grid, ped_fr_batch = x[0], y[0], d[0], x_grid[0], fr_ped[0]
-        num_nodes = batch_v.shape[1]
 
         nghood_enc = helper.neighborhood_vis_loc_encoder(
             hidden_size=args.rnn_size,
@@ -175,7 +178,6 @@ def main():
             num_layers=args.num_layers,
             grid_size=args.grid_size,
             dim=args.num_freq_blocks)
-
         stat_mask = tf.random_normal(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
         stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
 
@@ -187,7 +189,7 @@ def main():
                                    trainable=True, dtype=tf.float64)
 
             weight_ii = tf.Variable(name='weight_ii',
-                                    initial_value=init_w(shape=(args.num_freq_blocks, args.obs_len)),
+                                    initial_value=init_w(shape=(args.num_freq_blocks, batch_v.shape[0])), # args.obs_len
                                     trainable=True, dtype=tf.float64)
 
         tf.initialize_variables(var_list=[weight_i, weight_ii]).run()
@@ -204,7 +206,7 @@ def main():
         krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input,
                                     rel_features=tf.zeros_like(vislet_emb),
                                     num_nodes=num_nodes, obs_len=args.obs_len,
-                                    hidden_states=hidden_state,
+                                    # hidden_states=hidden_state,
                                     hidden_size=args.rnn_size,
                                     lambda_reg=args.lambda_param)
 
@@ -256,11 +258,12 @@ def main():
         start_1 = time.time()
 
         # st_embeddings, hidden_state, ng_output, c_hidden_state = \
-        st_embeddings, hidden_state, ng_output, c_hidden_state = sess.run([nghood_enc.input, nghood_enc.state_f00_b00_c,
-                      nghood_enc.ng_output, nghood_enc.c_hidden_state],
+        st_embeddings, hidden_state, ng_output, c_hidden_state = \
+            sess.run([nghood_enc.input, nghood_enc.state_f00_b00_c,
+                      nghood_enc.output, nghood_enc.c_hidden_state],
                      feed_dict={nghood_enc.input: inputs.eval(),
                                 nghood_enc.state_f00_b00_c: hidden_state,
-                                nghood_enc.ng_output: out_init.eval(),
+                                nghood_enc.output: out_init.eval(),
                                 nghood_enc.c_hidden_state: c_hidden_init.eval()})
         print('wall-clock time taken by social mask grid = {0} seconds'.format(time.time() - start_1))
         # using time.time() makes more sense than time.clock as car will be running other software sub-systems
@@ -268,39 +271,41 @@ def main():
 
         # Soft-attention mechanism equipped with static grid
         start_2 = time.time()
-        # static_mask, social_frame = sess.run([static_mask, output],
-        #              feed_dict={static_mask: static_mask_nd,
-        #                         social_frame: ng_output,
-        #                         state_f00_b00_c: c_soft * hidden_state,
-        #                         output: out_init.eval(),
-        #                         c_hidden_states: c_hidden_init.eval()
-        #                         })
+        static_mask, social_frame = sess.run([static_mask, output],
+                     feed_dict={static_mask: static_mask_nd,
+                                social_frame: ng_output,
+                                state_f00_b00_c: c_soft * hidden_state,
+                                output: out_init.eval(),
+                                c_hidden_states: c_hidden_init.eval()
+                                })
 
         print('wall-clock time taken by static mask grid = {0} seconds'.format(time.time() - start_2))
         # tf.while_loop(nghood_enc, stat_ngh, parallel_iterations=1, loop_vars=[])
         start_3 = time.time()
-        # input = tf.matmul(b=static_mask, a=social_frame).eval()
-        # input = tf.matmul(b=static_mask_nd, a=social_frame).eval()
-        # combined_ngh, hidden_state = sess.run([stat_ngh.input, stat_ngh.hidden_state],
-        #                                       feed_dict={stat_ngh.input: input,
-        #                                                  stat_ngh.hidden_state: hidden_state})
+        input = tf.matmul(b=static_mask, a=social_frame).eval()
+        input = tf.matmul(b=static_mask_nd, a=social_frame).eval()
+        combined_ngh, hidden_state = sess.run([stat_ngh.input, stat_ngh.hidden_state],
+                                              feed_dict={stat_ngh.input: input,
+                                                         stat_ngh.hidden_state: hidden_state})
 
         print('wall-clock time taken by combined mask grid = {0} seconds'.format(time.time() - start_3))
 
-        start_4 = time.time()
+
         reg_ng = np.transpose(args.lambda_param * np.transpose(ng_output))
-
-        tf.initialize_variables(var_list=[krnl_mdl.weight_r, krnl_mdl.embed_vis, krnl_mdl.weight_v, krnl_mdl.bias_v]).run()
-        tf.initialize_variables(var_list=[krnl_mdl.cost, krnl_mdl.attn, krnl_mdl.weight_c, krnl_mdl.weight_o]).run()
-
-        complete_traj, hidden_state, prob_mat = \
-            sess.run([krnl_mdl.pred_path_band, krnl_mdl.hidden_states, krnl_mdl.cost],
+        # krnl_mdl.embed_vis,
+        tf.initialize_variables(var_list=[krnl_mdl.weight_v, krnl_mdl.bias_v, krnl_mdl.weight_r,  krnl_mdl.attn]).run()
+        tf.initialize_variables(var_list=[krnl_mdl.cost, krnl_mdl.weight_c, krnl_mdl.weight_o]).run()#
+        start_sample = time.time()
+        # ,hidden_state,
+        start_4 = time.time()
+        complete_traj, prob_mat = \
+            sess.run([krnl_mdl.pred_path_band, krnl_mdl.cost], # krnl_mdl.hidden_states,
                      feed_dict={
                          krnl_mdl.outputs: np.concatenate((st_embeddings, vislet_emb.eval()), axis=0),
                          krnl_mdl.ngh: reg_ng,
                          krnl_mdl.rel_features: vislet_rel.eval(),
                          krnl_mdl.hidden_states: hidden_state,
-                         # krnl_mdl.lambda_reg: args.lambda_reg,
+                         # krnl_mdl.lambda_reg: args.lambda_param,
                          krnl_mdl.pred_path_band: tf.random_normal(shape=(2, 12, num_nodes)).eval()})
         print('wall-clock time taken by predictive kernel = {0} seconds'.format(time.time() - start_4))
 
@@ -309,9 +314,9 @@ def main():
         # attn = tf.exp(krnl_mdl.attn) / tf.cumsum(tf.exp(krnl_mdl.attn))
 
         # update with weighted hidden states
-        krnl_mdl.hidden_states = tf.nn.softmax(
-            krnl_mdl.hidden_states)  # weigh hidden states then send them back to glstm on next step
-        hidden_state = krnl_mdl.hidden_states.eval()
+        # krnl_mdl.hidden_states = tf.nn.softmax(
+        #     krnl_mdl.hidden_states)  # weigh hidden states then send them back to glstm on next step
+        # hidden_state = krnl_mdl.hidden_states.eval()
 
         # c_soft = np.sum(np.matmul(attn.eval(), hidden_state))
         print('Relational inference calculation took= {0} seconds'.format(time.time()-start_attn))
