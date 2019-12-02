@@ -34,14 +34,15 @@ class online_graph():
             for pedID, pos in current_batch.items():
                 node_id = pedID
                 node_pos_list = {}
-                node_pos_list[framenum] = pos
+                node_pos_list[framenum] = [pos]
 
                 node = Node(node_id, node_pos_list)
                 if framenum > 0 and framenum % 8:
                     node.setTargets(seq=future_traj[pedID])
                 self.onlineGraph.setNodes(framenum, node)
         else:
-            for idx in current_batch:
+            self.pos_list_len = len(current_batch)
+            for idx,itr in zip(current_batch, range(len(current_batch))):
                 try:
                     frame = current_batch[idx]  # * self.diff
                 except KeyError:
@@ -58,14 +59,14 @@ class online_graph():
                         # if framenum > 8 and framenum % 8 == 1:
                         try:
                             if len(future_traj[pedID]) < framenum:
-                                node.setTargets(seq=future_traj[pedID][0:8])
-                            elif len(future_traj[pedID][framenum:framenum+8]) < 8:
+                                node.setTargets(seq=future_traj[pedID][0:12])
+                            elif len(future_traj[pedID][framenum:framenum+12]) < 12:
                                 node.setTargets(future_traj[pedID])
                             else:
-                                node.setTargets(seq=future_traj[pedID][framenum:framenum+8])
+                                node.setTargets(seq=future_traj[pedID][framenum:framenum+12])
                         except KeyError:
                             continue
-                        self.onlineGraph.setNodes(framenum, node)
+                        self.onlineGraph.setNodes(itr, node)
 
         self.onlineGraph.dist_mat = torch.zeros(len(self.nodes), len(self.nodes))
         # check online graph nodes are correct
@@ -110,15 +111,22 @@ class Graph(nx.MultiDiGraph):
     def getEdges(self):
         return self.edges
 
-    def setNodes(self, framenum, node):
+    def setNodes(self, framenum, node, pos_list_len=8):
         # if len(self.nodes) <= framenum:
-        self.add_node(node.id,seq= node.seq,
-                node_pos_list= node.pos,
-                state= node.state,
-                cell=node.cell,
-                targets= node.targets,
-                vel= node.vel)
-
+        if node.id in self.nodes.keys():
+            try:
+                self.nodes[node.id]['node_pos_list'][framenum] = node.pos
+            except IndexError:
+                pass
+                # self.nodes[node.id]['node_pos_list'] = \
+                #     np.concatenate((self.nodes[node.id]['node_pos_list'], np.reshape(node.pos, newshape=(1, 2))))
+        else:
+            self.add_node(node.id,seq= node.seq,
+                    node_pos_list= np.zeros(shape=(pos_list_len, 2)),
+                    state= node.state,
+                    cell=node.cell,
+                    targets= node.targets,
+                    vel= node.vel)
         # self.node_attr_dict_factory()
         # self.nodes.append({})
         # self.nodes[framenum][node.id] = node
@@ -154,6 +162,7 @@ class Graph(nx.MultiDiGraph):
 class Node():
     def __init__(self, node_id, node_pos_list):
         self.id = node_id
+        # if len(self.pos):
         self.pos = node_pos_list
         self.state = torch.zeros(batch_size, 256)  # 256 self.human_ebedding_size
         self.cell = torch.zeros(batch_size, 256)
