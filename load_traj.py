@@ -17,7 +17,7 @@ class DataLoader():
         datasets : The indices of the datasets to use
         forcePreProcess : Flag to forcefully preprocess the data again from csv files
         '''
-        parent_dir = '/home/serene/PycharmProjects/multimodaltraj_2/data'
+        parent_dir = '/home/siri0005/Documents/multimodaltraj_2/data'
         # '/fakepath/Documents/self-growing-spatial-graph/self-growing-gru-offline_avgPool/data'
         # '/Data/stanford_campus_dataset/annotations/'
         # List of data directories where world-coordinates data is stored
@@ -123,7 +123,7 @@ class DataLoader():
 
         self.raw_data = np.genfromtxt(fname=data_file, delimiter=',') # remove
         self.len = self.raw_data.shape[1]
-        self.max = int(self.raw_data.shape[1]*  0.7)#
+        self.max = int(self.raw_data.shape[1] * 0.7)#
         self.val_max = int(self.raw_data.shape[1] * 0.3)
 
         f.close()
