@@ -347,13 +347,16 @@ def train(args):
                                 print('Frame {3} Batch {0} of {1}, Loss = {2}, num_ped={4}'
                                       .format(b, dataloader.num_batches, krnl_mdl.cost, frame, len(target_traj)))
 
-                                with out_sess.graph.as_default():
-                                    all_vars = tf.all_variables()
-                                    # out_sess.graph.add_to_collections(names=sess.graph.get_all_collection_keys(),
-                                    #                                   value=tf.all_variables()) #= sess.graph.as_graph_def()
-                                    
-                                    tf.import_graph_def(graph_def=sess.graph.as_graph_def(),
-                                                            input_map=sess.graph.get_all_collection_keys())
+                                # all_vars = tf.all_variables()
+                                # graph_def = sess.graph.as_graph_def()
+
+                                all_outer_vars = tf.all_variables()
+                                
+                                outer_def = sess.graph.as_graph_def()
+                                # out_sess.graph.add_to_collections(names=sess.graph.get_all_collection_keys(),
+                                #                                   value=tf.all_variables()) #= sess.graph.as_graph_def()
+                                #     ,
+                                # input_map=sess.graph.get_all_collection_keys()
                                 # return g
 
                                 sess.close()
@@ -383,8 +386,9 @@ def train(args):
                                 #     sess.run(tf.all_variables()) # run a second time to overcome this bug in TF variables initialization
                                     # tf.initialize_variables(tf.all_variables()).run()
                                 # sess.run(init_new_vars_op)
-
-                                saver = tf.train.Saver(tf.all_variables())
+                                # with out_sess.as_default():
+                                tf.import_graph_def(graph_def=outer_def, input_map= {})
+                                saver = tf.train.Saver(all_outer_vars)
                                 saver.save(out_sess, checkpoint_path, global_step=e * dataloader.num_batches + b)
 
                                 print("model saved to {}".format(checkpoint_path))
