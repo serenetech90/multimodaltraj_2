@@ -36,20 +36,25 @@ class g2k_lstm_mcr():
                                                    shape=[int(in_features.shape[0]), obs_len], name="ngh")
 
             with tf.variable_scope("krnl_weights", reuse=True):
-                self.cost = tf.Variable(name='cost', initial_value=self.init_w(shape=[obs_len, obs_len],dtype=tf.float64),
+                self.cost = tf.Variable(name='cost', initial_value=
+                sess_g.get_tensor_by_name(name='krnl_weights_21/cost:0'),
+                                        # self.init_w(shape=[obs_len, obs_len],dtype=tf.float64),
                                         shape=[obs_len, obs_len])
 
                 self.attn = tf.Variable(name='attn',
-                                        initial_value=self.init_w(shape=[int(in_features.shape[0]), int(in_features.shape[0])], dtype=tf.float64),
+                                        initial_value= sess_g.get_tensor_by_name(name='krnl_weights_21/attn:0'),
+                                        #self.init_w(shape=[int(in_features.shape[0]), int(in_features.shape[0])], dtype=tf.float64),
                                         shape=[int(in_features.shape[0]),int(in_features.shape[0])])
 
                 self.weight_v = tf.Variable(name='weight_v', initial_value= \
-                                            self.init_w(shape=(obs_len, int(in_features.shape[0])+2)),
+                    sess_g.get_tensor_by_name(name='krnl_weights_21/weight_v:0'),
+                                            # self.init_w(shape=(obs_len, int(in_features.shape[0])+2)),
                                             # shape=tf.shape(1,in_features.shape[1].value),
                                             dtype=tf.float64)
 
                 self.bias_v = tf.Variable(name='bias_v', initial_value= \
-                                          self.init_w(shape=(int(in_features.shape[0]),)),
+                    sess_g.get_tensor_by_name(name='krnl_weights_21/bias_v:0'),
+                                          # self.init_w(shape=(int(in_features.shape[0]),)),
                                           # shape=tf.shape(1,in_features.shape[1].value),
                                           dtype=tf.float64)
 
@@ -57,21 +62,30 @@ class g2k_lstm_mcr():
                                             self.init_w(shape=(obs_len, num_nodes)),#int(in_features.shape[0])
                                             # shape=tf.shape(1,in_features.shape[1].value),
                                             dtype=tf.float64)
-
                 self.weight_c = tf.Variable(name='weight_c', initial_value= \
-                                            self.init_w(shape=(24, obs_len)),# 16 when pred_len = 8
+                    sess_g.get_tensor_by_name(name='krnl_weights_21/weight_c:0'),
+                                            # self.init_w(shape=(24, obs_len)),# 16 when pred_len = 8
                                             # shape=tf.shape(1,in_features.shape[1].value),
                                             dtype=tf.float64)
+
             with tf.variable_scope('krnl_embed', reuse=True):
                 self.weight_r = tf.Variable(name='weight_r', initial_value= \
-                                              self.init_w(shape=(obs_len, 2)),
+                    sess_g.get_tensor_by_name(name='krnl_embed_21/weight_r:0'),
+                                              # self.init_w(shape=(obs_len, 2)),
                                               # shape=tf.shape(1,in_features.shape[1].value),
                                               dtype=tf.float64)
-
                 # self.embed_vis = tf.Variable(name='embed_vis', initial_value= \
                 #                             self.init_w(shape=(obs_len, int(in_features.shape[0]))),
                 #                             # shape=tf.shape(1,in_features.shape[1].value),
                 #                             dtype=tf.float64)
+
+            # self.weight_r = tf.Variable(sess_g.get_tensor_by_name(name='krnl_embed_4/weight_r_1:0'))
+            # self.weight_v = tf.Variable(sess_g.get_tensor_by_name(name='krnl_weights_4/weight_v_1:0'))
+            # self.weight_c = tf.Variable(sess_g.get_tensor_by_name(name='krnl_weights_4/weight_c_1:0'))
+            # # self.weight_o = tf.Variable(sess_g.get_tensor_by_name(name='krnl_weights_4/weight_o_1:0'))
+            # self.attn = tf.Variable(sess_g.get_tensor_by_name(name='krnl_weights_4/attn_1:0'))
+            # self.cost = tf.Variable(sess_g.get_tensor_by_name(name='krnl_weights_4/cost_1:0'))
+            # self.bias_v = tf.Variable(sess_g.get_tensor_by_name(name='krnl_weights_4/bias_v_1:0'))
 
             self.hidden_states = tf.placeholder_with_default(
                                     input=tf.random.normal(
