@@ -1,8 +1,7 @@
-import torch.nn as nn
-import torch
+from matplotlib.pyplot import imread
 # from torch.utils.serialization import load_lua as llua
 import tensorflow as tf
-import tensorflow.contrib.rnn as rnn_t
+# import tensorflow.contrib.rnn as rnn_t
 from tensorflow.contrib.rnn.python.ops import rnn_cell as rnn
 # import tensorflow.contrib.grid_rnn as grnn
 # https://github.com/tensorflow/tensorflow/blob/r1.8/tensorflow/contrib/rnn/python/ops/rnn_cell.py
@@ -109,7 +108,7 @@ class neighborhood_stat_enc():
     # try grid lstm cell in place of cnn to encode spatial features
     # to encode relative spatial interactions human-space combine both neighborhood networks,
     # the static neighborhood network encodes the poi in the scene first
-    def __init__(self, hidden_size, num_layers,grid_size, dim):
+    def __init__(self, ctxt_path, hidden_size, num_layers,grid_size, dim):
         # super(neighborhood_stat_enc, self).__init__()
 
         self.hidden_size = hidden_size
@@ -120,6 +119,14 @@ class neighborhood_stat_enc():
         self.hidden_state = tf.placeholder(name='hidden_state', shape=(dim, self.hidden_size),
                                     dtype=tf.float64)
 
+        # ctxt_img = tf.convert_to_tensor(imread(ctxt_path[0]), dtype=tf.float64)
+        # ctxt_img = tf.convert_to_tensor(tf.pad(ctxt_img, paddings=tf.constant([[1, 1, ], [0, 1], [0, 0]])),
+        #                                 dtype=tf.float64)
+        #
+        # ctxt_img = tf.expand_dims(ctxt_img, axis=0)
+        # self._2dconv = tf.nn.conv2d(input=ctxt_img, filter=tf.random_normal(shape=[561, 711, 3, 1],dtype=tf.float64),
+        #                             padding='VALID', strides=[1, 1, 1, 1])
+        # self._2dconv = tf.squeeze(self._2dconv)
         # in gridLSTM frequency blocks are the units of lstm stacking vertically
         # while time LSTM spans horizontally
         self.rnn = rnn.GridLSTMCell(num_units=num_layers,
@@ -153,3 +160,4 @@ class neighborhood_stat_enc():
 
 
         # return output, new_hidden
+
