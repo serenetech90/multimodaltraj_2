@@ -107,7 +107,7 @@ def train(args):
                                 dataloader.reset_data_pointer()
                                 break
 
-                            if b == 0:
+                            if e == 0 and b == 0:
                                 ctxt_img_path = glob.glob(dataloader.current_dir + 'ctxt.png')
                                 ctxt_img = tf.convert_to_tensor(imread(ctxt_img_path[0]), dtype=tf.float64)
                                 ctxt_img_pd = tf.convert_to_tensor(
