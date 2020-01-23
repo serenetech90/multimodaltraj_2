@@ -30,10 +30,10 @@ class ArgsParser():
                         help='RNN sequence length')
 
     # Number of epochs parameter
-    parser.add_argument('--num_epochs', type=int, default=20,
+    parser.add_argument('--num_epochs', type=int, default=10,
                         help='number of epochs')
     # Frequency at which the model should be saved parameter
-    parser.add_argument('--save_every', type=int, default=10,
+    parser.add_argument('--save_every', type=int, default=50,
                         help='save frequency')
     # TODO: (resolve) Clipping gradients for now. No idea whether we should
     # Gradient value at which it should be clipped
@@ -53,7 +53,7 @@ class ArgsParser():
     parser.add_argument('--embedding_size', type=int, default=64,
                         help='Embedding dimension for the spatial coordinates')
     # Size of neighborhood to be considered parameter
-    parser.add_argument('--neighborhood_size', type=int, default=32,
+    parser.add_argument('--neighborhood_size', type=int, default=64,
                         help='Neighborhood size to be considered for social grid')
     # Size of the social grid parameter
     parser.add_argument('--grid_size', type=int, default=4,

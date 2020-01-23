@@ -2,20 +2,20 @@ import argParser as parser
 import time
 from models import g2k_lstm_mcr as mcr
 from models import gsk_lstm_cell as cell
-from models import g2k_lstm_mc as MC
+# from models import g2k_lstm_mc as MC
 from matplotlib.pyplot import imread
 import networkx_graph as nx_g
 import load_traj as load
 import tensorflow as tf
 import helper
 import numpy as np
-import tensorflow.python.util.deprecation as deprecation
+# import tensorflow.python.util.deprecation as deprecation
 import os
 import glob
 
 # reduce tf messages
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-deprecation._PRINT_DEPRECATION_WARNINGS = False
+# deprecation._PRINT_DEPRECATION_WARNINGS = False
 
 
 def main():
@@ -51,7 +51,7 @@ def train(args):
 
             datasets = {2, 3, 4}
             datasets.remove(l)  # leave dataset
-            parent_dir = '/home/siri0005/Documents/multimodaltraj_2/'
+            parent_dir = '/home/phd-2020/Documents/PycharmProjects/multimodaltraj_2/ablations/ngh_64/'
             for d in datasets:  # range(2,5):
                 # /home/siri0005/Documents/multimodaltraj_2/log/
                 log_count = parent_dir+'log/g2k_lstm_counts_{0}.txt'.format(
@@ -108,15 +108,20 @@ def train(args):
                                 break
 
                             if e == 0 and b == 0:
+                                dim = int(args.neighborhood_size / args.grid_size)
                                 ctxt_img_path = glob.glob(dataloader.current_dir + 'ctxt.png')
                                 ctxt_img = tf.convert_to_tensor(imread(ctxt_img_path[0]), dtype=tf.float64)
+
+
                                 ctxt_img_pd = tf.convert_to_tensor(
                                     tf.pad(ctxt_img, paddings=tf.constant([[1, 1, ], [0, 1], [0, 0]])),
                                     dtype=tf.float64)
+                                width = int(ctxt_img_pd.shape.dims[0])
+                                height = int(ctxt_img_pd.shape.dims[1])
 
                                 ctxt_img_pd = tf.expand_dims(ctxt_img_pd, axis=0)
                                 _2dconv = tf.nn.conv2d(input=ctxt_img_pd,
-                                                       filter=tf.random_normal(shape=[561, 713, 3, 1],
+                                                       filter=tf.random_normal(shape=[width-dim+1, height-dim+1, 3, 1],
                                                                                dtype=tf.float64),
                                                        padding='VALID', strides=[1, 1, 1, 1])
                                 _2dconv = tf.squeeze(_2dconv).eval()
@@ -126,11 +131,11 @@ def train(args):
                                 init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0,
                                                                        dtype=tf.float64)
 
-                                hidden_state = np.zeros(shape=(args.num_freq_blocks, args.rnn_size))
+                                hidden_state = np.zeros(shape=(dim, args.rnn_size))
 
                                 nghood_enc = helper.neighborhood_vis_loc_encoder(
                                     hidden_size=args.rnn_size,
-                                    hidden_len=args.num_freq_blocks,
+                                    hidden_len=dim,
                                     num_layers=args.num_layers,
                                     grid_size=args.grid_size,
                                     embedding_size=args.embedding_size,
@@ -140,7 +145,7 @@ def train(args):
                                     hidden_size=args.rnn_size,
                                     num_layers=args.num_layers,
                                     grid_size=args.grid_size,
-                                    dim=args.num_freq_blocks,
+                                    dim=dim,
                                     ctxt_path=ctxt_img_path)
 
                                 with tf.variable_scope('ngh_stat'):
@@ -159,13 +164,12 @@ def train(args):
 
                                 with tf.variable_scope('nghood_init', reuse=True):
                                     out_init = tf.zeros(dtype=tf.float64, shape=(
-                                        args.num_freq_blocks, (args.grid_size * (args.grid_size / 2))))
+                                        dim, dim)) #(args.grid_size * (args.grid_size / 2))))
                                     c_hidden_init = tf.zeros(dtype=tf.float64, shape=(
-                                        args.num_freq_blocks, (args.grid_size * (args.grid_size / 2))))
+                                        dim, dim)) # (args.grid_size * (args.grid_size / 2))))
 
-                                dim = int(args.neighborhood_size / args.grid_size)
-                                stat_mask = tf.zeros(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
-                                stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
+                                stat_mask = tf.zeros(shape=(dim, args.obs_len), dtype=tf.float64)
+                                stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=(1/args.obs_len), dtype=tf.float64), axis=0)
                                 static_mask_nd = stat_mask.eval()
 
                                 _2dconv_in = tf.matmul(_2dconv, stat_mask)
@@ -184,11 +188,11 @@ def train(args):
                             with tf.variable_scope('weight_input',reuse=True):
                                 weight_i = tf.Variable(name='weight_i',
                                                        initial_value=init_w(
-                                                           shape=(num_nodes, args.num_freq_blocks)),
+                                                           shape=(num_nodes, dim)),
                                                        trainable=True, dtype=tf.float64)
                                 weight_ii = tf.Variable(name='weight_ii',
                                                         initial_value=init_w(
-                                                            shape=(args.num_freq_blocks, args.obs_len)),
+                                                            shape=(dim, args.obs_len)),
                                                         trainable=True, dtype=tf.float64)
                             tf.initialize_variables(var_list=[weight_i, weight_ii]).run()
 
@@ -234,7 +238,6 @@ def train(args):
                                 #         frame += args.seq_length + 1
                                 #     continue
 
-
                                 # compute relative locations and relative vislets
                                 st_embeddings, hidden_state, ng_output, c_hidden_state = \
                                     sess.run([nghood_enc.input, nghood_enc.state_f00_b00_c,
@@ -267,7 +270,7 @@ def train(args):
                                              feed_dict={
                                                  krnl_mdl.outputs: #st_embeddings,
                                                  np.concatenate((st_embeddings, vislet_emb.eval()), axis=0),
-                                                 krnl_mdl.ngh: _2dconv,
+                                                 krnl_mdl.ngh: _2dconv_in.eval(),
                                                  krnl_mdl.rel_features: vislet_rel.eval(),
                                                  krnl_mdl.hidden_states: hidden_state,
                                                  krnl_mdl.out_size: num_nodes,
@@ -348,12 +351,12 @@ def train(args):
                                                         trainable=True, dtype=tf.float64)
                                 weight_i = tf.Variable(name='weight_i',
                                                        initial_value=init_w(
-                                                           shape=(batch_v.shape[1], args.num_freq_blocks)),
+                                                           shape=(batch_v.shape[1], dim)),
                                                        trainable=True, dtype=tf.float64)
 
                                 weight_ii = tf.Variable(name='weight_ii',
                                                         initial_value=init_w(
-                                                            shape=(args.num_freq_blocks, args.obs_len)),
+                                                            shape=(dim, args.obs_len)),
                                                         trainable=True, dtype=tf.float64)
 
                             tf.initialize_variables(var_list=[weight_vi, weight_i, weight_ii]).run() #
@@ -378,7 +381,7 @@ def train(args):
                             #     grid_size=args.grid_size,
                             #     dim=args.num_freq_blocks)
                             # stat_mask = tf.random_normal(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
-                            # stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
+                            # stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=(1/dim), dtype=tf.float64), axis=1)
                             # static_mask_nd = stat_mask.eval()
                             # krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input,  # MC.g2k_lstm_mc
                             #                             hidden_size=args.rnn_size,
@@ -534,10 +537,10 @@ def train(args):
         dataloader.valid_num_batches = int(dataloader.val_max / (dataloader.batch_size * 20))
 
         with tf.variable_scope('nghood_init',reuse=True):
-            out_init = tf.zeros(dtype=tf.float64,
-                                shape=(args.num_freq_blocks, (args.grid_size * (args.grid_size / 2))))
-            c_hidden_init = tf.zeros(dtype=tf.float64,
-                                     shape=(args.num_freq_blocks, (args.grid_size * (args.grid_size / 2))))
+            out_init = tf.zeros(dtype=tf.float64, shape=(
+                dim, dim))  # (args.grid_size * (args.grid_size / 2))))
+            c_hidden_init = tf.zeros(dtype=tf.float64, shape=(
+                dim, dim))  # (args.grid_size * (args.grid_size / 2))))
 
         # variables = def_graph.get_collection('variables')
 
@@ -626,17 +629,18 @@ def train(args):
 
             # num_targets += num_nodes
 
-            krnl_mdl = cell.gsk_lstm_cell(in_features=nghood_enc.input,
+            krnl_mdl = mcr.g2k_lstm_mcr(in_features=nghood_enc.input,
                                       num_nodes=num_nodes, obs_len=args.pred_len,
                                       lambda_reg=args.lambda_param,
+                                      hidden_size=args.rnn_size,
                                       sess_g=def_graph)
 
             with tf.variable_scope('weight_input', reuse=True):
                 weight_i = tf.Variable(name='weight_i',
-                                       initial_value=init_w(shape=(num_nodes, args.num_freq_blocks)),
+                                       initial_value=init_w(shape=(num_nodes, dim)),
                                        trainable=True, dtype=tf.float64)
                 weight_ii = tf.Variable(name='weight_ii',
-                                        initial_value=init_w(shape=(args.num_freq_blocks, args.obs_len)),
+                                        initial_value=init_w(shape=(dim, args.obs_len)),
                                         trainable=True, dtype=tf.float64)
             tf.initialize_variables(var_list=[weight_i, weight_ii]).run()
 
@@ -653,9 +657,10 @@ def train(args):
             #
             # vislet_rel = vislet_past * vislet_emb
 
-            stat_mask = tf.random_normal(shape=(dim, args.num_freq_blocks), dtype=tf.float64)
-            stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=0.125, dtype=tf.float64), axis=1)
+            stat_mask = tf.zeros(shape=(dim, args.obs_len), dtype=tf.float64)
+            stat_mask += tf.expand_dims(tf.range(start=0, limit=1, delta=(1 / args.obs_len), dtype=tf.float64), axis=0)
             static_mask_nd = stat_mask.eval()
+
             # sess.run(fetches=tf.initialize_all_variables())
             # krnl_mdl.weight_r, krnl_mdl.attn,
             tf.initialize_variables(var_list=[ krnl_mdl.weight_v, krnl_mdl.bias_v]).run()  # , krnl_mdl.embed_vis
@@ -812,7 +817,7 @@ def train(args):
         print('Cross-Validation total final error (FDE) for dataset {0} = '.format(l), np.mean(cv_fde_err))
         # /home/siri0005/Documents/multimodaltraj_2
         checkpoint_path = os.path.join(parent_dir+'save',
-                                       'g2k_MCP_model_kfold_val_{0}.ckpt'.format(l))
+                                       'g2k_MPC_model_kfold_val_{0}.ckpt'.format(l))
 
         saver.save(val_sess, checkpoint_path, global_step= e * dataloader.valid_num_batches + vb)
         print("model saved to {}".format(checkpoint_path))

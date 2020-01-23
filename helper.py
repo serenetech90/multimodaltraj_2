@@ -1,4 +1,3 @@
-from matplotlib.pyplot import imread
 # from torch.utils.serialization import load_lua as llua
 import tensorflow as tf
 # import tensorflow.contrib.rnn as rnn_t
@@ -33,7 +32,7 @@ class neighborhood_vis_loc_encoder():
                                     feature_size=grid_size,
                                     frequency_skip=grid_size,
                                     use_peepholes=True,
-                                    num_frequency_blocks=[int(grid_size/2)],
+                                    num_frequency_blocks=[int(hidden_len/grid_size)], #int(grid_size/2)
                                     share_time_frequency_weights=True,
                                     state_is_tuple=False,
                                     couple_input_forget_gates=True,
@@ -43,7 +42,7 @@ class neighborhood_vis_loc_encoder():
         #                           initializer='normal', dynamic=True,
         #                           dtype=tf.float64)
 
-        self.output = tf.placeholder(dtype=tf.float64, shape=[hidden_len, (grid_size * (grid_size/2))],
+        self.output = tf.placeholder(dtype=tf.float64, shape=[hidden_len, hidden_len], #(grid_size * (grid_size/2))],
                                      name="output")
         # .add_weight(name='weight', shape=(2,hidden_size))
                                     # initial_value=init_w(shape=(2,hidden_size)),
@@ -113,7 +112,7 @@ class neighborhood_stat_enc():
 
         self.hidden_size = hidden_size
 
-        self.input = tf.placeholder(name='input', shape=(dim, dim),
+        self.input = tf.placeholder(name='input', shape=(dim, 8),
                                      dtype=tf.float64)
 
         self.hidden_state = tf.placeholder(name='hidden_state', shape=(dim, self.hidden_size),
