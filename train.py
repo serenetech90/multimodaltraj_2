@@ -51,7 +51,7 @@ def train(args):
 
             datasets = {2, 3, 4}
             datasets.remove(l)  # leave dataset
-            parent_dir = '/home/phd-2020/Documents/PycharmProjects/multimodaltraj_2/ablations/ngh_64/'
+            parent_dir = '/home/siri0005/Documents/multimodaltraj_2/'
             for d in datasets:  # range(2,5):
                 # /home/siri0005/Documents/multimodaltraj_2/log/
                 log_count = parent_dir+'log/g2k_lstm_counts_{0}.txt'.format(
@@ -107,11 +107,10 @@ def train(args):
                                 dataloader.reset_data_pointer()
                                 break
 
-                            if e == 0 and b == 0:
+                            if e == 0:
                                 dim = int(args.neighborhood_size / args.grid_size)
                                 ctxt_img_path = glob.glob(dataloader.current_dir + 'ctxt.png')
                                 ctxt_img = tf.convert_to_tensor(imread(ctxt_img_path[0]), dtype=tf.float64)
-
 
                                 ctxt_img_pd = tf.convert_to_tensor(
                                     tf.pad(ctxt_img, paddings=tf.constant([[1, 1, ], [0, 1], [0, 0]])),
@@ -127,11 +126,11 @@ def train(args):
                                 _2dconv = tf.squeeze(_2dconv).eval()
                                 _2dconv = args.lambda_param * _2dconv
                                 # _2dconv /= np.max(_2dconv) - 1
+                                hidden_state = np.zeros(shape=(dim, args.rnn_size))
 
+                            if b == 0:
                                 init_w = tf.initializers.random_normal(mean=0, stddev=1, seed=0,
                                                                        dtype=tf.float64)
-
-                                hidden_state = np.zeros(shape=(dim, args.rnn_size))
 
                                 nghood_enc = helper.neighborhood_vis_loc_encoder(
                                     hidden_size=args.rnn_size,
